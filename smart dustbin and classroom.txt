@@ -1,0 +1,373 @@
+#include <TM1637Display.h>
+
+// ============================================================
+//        SMART CLASSROOM + SMART DUSTBIN
+//        Arduino UNO
+// ============================================================
+
+// ---------- SMART CLASSROOM PINS ----------
+#define ENTRY_PIR       2
+#define EXIT_PIR        3
+#define LIGHT_RELAY     8
+#define FAN_RELAY       9
+
+// ---------- SMART DUSTBIN PINS ----------
+#define TM_CLK          4
+#define TM_DIO          5
+#define ULTRASONIC_TRIG 6
+#define ULTRASONIC_ECHO 7
+#define BUZZER_PIN      10
+
+// ---------- DUSTBIN SETTINGS ----------
+const float BIN_HEIGHT = 12.0;   // Dustbin height in cm
+const int   BUZZER_LEVEL = 80;   // Buzzer starts at 80%
+
+TM1637Display display(TM_CLK, TM_DIO);
+
+// ---------- CLASSROOM VARIABLES ----------
+int peopleCount = 0;
+
+bool entryFlag = false;
+bool exitFlag = false;
+bool waitingForClear = false;
+
+bool lightFlag = false;
+bool fanFlag = false;
+
+unsigned long sequenceStartTime = 0;
+const unsigned long SEQUENCE_TIMEOUT = 5000;   // 5 seconds
+
+// ---------- DUSTBIN VARIABLES ----------
+unsigned long lastDustbinCheck = 0;
+const unsigned long DUSTBIN_INTERVAL = 500;
+int currentFill = 0;
+
+// ---------- FUNCTION DECLARATIONS ----------
+float getDistance();
+float getAverageDistance();
+void updateDustbin();
+void updateClassroom();
+void turnAppliancesON();
+void turnAppliancesOFF();
+
+// ============================================================
+// SETUP
+// ============================================================
+void setup()
+{
+  Serial.begin(9600);
+
+  // Classroom pins
+  pinMode(ENTRY_PIR, INPUT);
+  pinMode(EXIT_PIR, INPUT);
+  pinMode(LIGHT_RELAY, OUTPUT);
+  pinMode(FAN_RELAY, OUTPUT);
+  digitalWrite(LIGHT_RELAY, LOW);
+  digitalWrite(FAN_RELAY, LOW);
+
+  // Dustbin pins
+  pinMode(ULTRASONIC_TRIG, OUTPUT);
+  pinMode(ULTRASONIC_ECHO, INPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(ULTRASONIC_TRIG, LOW);
+  digitalWrite(BUZZER_PIN, LOW);
+
+  // Display
+  display.setBrightness(7);
+  display.showNumberDec(0, false);
+
+  Serial.println();
+  Serial.println("================================");
+  Serial.println(" SMART CLASSROOM + DUSTBIN");
+  Serial.println("================================");
+  Serial.println("PIR warming up...");
+  Serial.println("Please wait 30 seconds");
+
+  // Show "----" on display during warm-up
+  uint8_t dashes[] = { SEG_G, SEG_G, SEG_G, SEG_G };
+  display.setSegments(dashes);
+
+  // PIR warm-up
+  delay(30000);
+
+  display.showNumberDec(0, false);
+
+  Serial.println("--------------------------------");
+  Serial.println("SYSTEM READY");
+  Serial.println("People Count: 0");
+  Serial.println("--------------------------------");
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+void loop()
+{
+  // Dustbin check every 500 ms
+  if (millis() - lastDustbinCheck >= DUSTBIN_INTERVAL)
+  {
+    lastDustbinCheck = millis();
+    updateDustbin();
+  }
+
+  // Classroom check
+  updateClassroom();
+
+  delay(10);
+}
+
+// ============================================================
+// ULTRASONIC DISTANCE
+// ============================================================
+float getDistance()
+{
+  digitalWrite(ULTRASONIC_TRIG, LOW);
+  delayMicroseconds(3);
+  digitalWrite(ULTRASONIC_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ULTRASONIC_TRIG, LOW);
+
+  long duration = pulseIn(ULTRASONIC_ECHO, HIGH, 30000);
+
+  if (duration == 0)
+  {
+    return -1;   // No echo
+  }
+
+  return duration * 0.0343 / 2.0;
+}
+
+float getAverageDistance()
+{
+  float total = 0;
+  int validReadings = 0;
+
+  for (int i = 0; i < 5; i++)
+  {
+    float distance = getDistance();
+
+    if (distance > 0 && distance <= 400)
+    {
+      total += distance;
+      validReadings++;
+    }
+
+    delay(20);
+  }
+
+  if (validReadings == 0)
+  {
+    return -1;
+  }
+
+  return total / validReadings;
+}
+
+// ============================================================
+// SMART DUSTBIN
+// ============================================================
+void updateDustbin()
+{
+  float distance = getAverageDistance();
+
+  // Sensor error
+  if (distance < 0)
+  {
+    Serial.println("Dustbin Sensor Error");
+    display.showNumberDec(0, false);
+    digitalWrite(BUZZER_PIN, LOW);
+    return;
+  }
+
+  // Empty bin
+  if (distance >= BIN_HEIGHT)
+  {
+    distance = BIN_HEIGHT;
+  }
+
+  // Completely full
+  if (distance <= 0.5)
+  {
+    distance = 0;
+  }
+
+  // Fill percentage
+  float fillPercentage = ((BIN_HEIGHT - distance) / BIN_HEIGHT) * 100.0;
+  fillPercentage = constrain(fillPercentage, 0, 100);
+
+  currentFill = (int)(fillPercentage + 0.5);
+
+  display.showNumberDec(currentFill, false);
+
+  Serial.print("DUSTBIN | Distance: ");
+  Serial.print(distance, 1);
+  Serial.print(" cm | Fill: ");
+  Serial.print(currentFill);
+  Serial.println("%");
+
+  // Buzzer
+  if (currentFill >= BUZZER_LEVEL)
+  {
+    digitalWrite(BUZZER_PIN, LOW);
+    Serial.println("DUSTBIN WARNING: 80% OR MORE FULL");
+  }
+  else
+  {
+    digitalWrite(BUZZER_PIN, HIGH);
+  }
+}
+
+// ============================================================
+// SMART CLASSROOM
+// ============================================================
+void updateClassroom()
+{
+  int entry = digitalRead(ENTRY_PIR);
+  int exitSensor = digitalRead(EXIT_PIR);
+
+  // Wait until both PIR sensors are clear
+  if (waitingForClear)
+  {
+    if (entry == LOW && exitSensor == LOW)
+    {
+      waitingForClear = false;
+
+      Serial.println("PIR sensors clear");
+      Serial.println("----------------------------");
+
+      delay(300);
+    }
+
+    return;
+  }
+
+  // ---------- ENTRY START (PIR 1 first) ----------
+  if (entry == HIGH && exitSensor == LOW && !entryFlag && !exitFlag)
+  {
+    entryFlag = true;
+    sequenceStartTime = millis();
+
+    Serial.println();
+    Serial.println("ENTRY: PIR 1 detected");
+    Serial.println("ENTRY: Waiting for PIR 2...");
+  }
+
+  // ---------- ENTRY COMPLETE (PIR 1 -> PIR 2) ----------
+  if (entryFlag)
+  {
+    if (exitSensor == HIGH)
+    {
+      peopleCount++;
+
+      Serial.println("PERSON ENTERED");
+      Serial.print("People Count: ");
+      Serial.println(peopleCount);
+
+      entryFlag = false;
+      turnAppliancesON();
+      waitingForClear = true;
+      return;
+    }
+
+    if (millis() - sequenceStartTime >= SEQUENCE_TIMEOUT)
+    {
+      Serial.println("ENTRY TIMEOUT");
+      Serial.println("No person counted");
+
+      entryFlag = false;
+      waitingForClear = true;
+      return;
+    }
+  }
+
+  // ---------- EXIT START (PIR 2 first) ----------
+  if (exitSensor == HIGH && entry == LOW && !exitFlag && !entryFlag)
+  {
+    exitFlag = true;
+    sequenceStartTime = millis();
+
+    Serial.println();
+    Serial.println("EXIT: PIR 2 detected");
+    Serial.println("EXIT: Waiting for PIR 1...");
+  }
+
+  // ---------- EXIT COMPLETE (PIR 2 -> PIR 1) ----------
+  if (exitFlag)
+  {
+    if (entry == HIGH)
+    {
+      if (peopleCount > 0)
+      {
+        peopleCount--;
+
+        Serial.println("PERSON EXITED");
+        Serial.print("People Count: ");
+        Serial.println(peopleCount);
+      }
+      else
+      {
+        Serial.println("ROOM ALREADY EMPTY");
+      }
+
+      exitFlag = false;
+
+      if (peopleCount == 0)
+      {
+        turnAppliancesOFF();
+      }
+
+      waitingForClear = true;
+      return;
+    }
+
+    if (millis() - sequenceStartTime >= SEQUENCE_TIMEOUT)
+    {
+      Serial.println("EXIT TIMEOUT");
+      Serial.println("No person counted");
+
+      exitFlag = false;
+      waitingForClear = true;
+      return;
+    }
+  }
+}
+
+// ============================================================
+// LIGHT + FAN ON
+// ============================================================
+void turnAppliancesON()
+{
+  if (!lightFlag)
+  {
+    digitalWrite(LIGHT_RELAY, HIGH);
+    lightFlag = true;
+    Serial.println("LIGHT: ON");
+  }
+
+  if (!fanFlag)
+  {
+    digitalWrite(FAN_RELAY, HIGH);
+    fanFlag = true;
+    Serial.println("FAN: ON");
+  }
+}
+
+// ============================================================
+// LIGHT + FAN OFF
+// ============================================================
+void turnAppliancesOFF()
+{
+  if (lightFlag)
+  {
+    digitalWrite(LIGHT_RELAY, LOW);
+    lightFlag = false;
+    Serial.println("LIGHT: OFF");
+  }
+
+  if (fanFlag)
+  {
+    digitalWrite(FAN_RELAY, LOW);
+    fanFlag = false;
+    Serial.println("FAN: OFF");
+  }
+}

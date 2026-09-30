@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Canteen Token Management System</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --background: #f4f7fb;
+            --card: #ffffff;
+            --text: #172033;
+            --muted: #6b7280;
+            --border: #e5e7eb;
+            --success: #16a34a;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+        }
+
+        body {
+            font-family:
+                Inter,
+                "Segoe UI",
+                Roboto,
+                Arial,
+                sans-serif;
+
+            background: var(--background);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* =========================
+           HEADER
+        ========================= */
+
+        header {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border);
+            height: 72px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding: 0 6%;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+
+            background: var(--primary);
+            color: white;
+
+            border-radius: 10px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .brand-text h1 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .brand-text p {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+
+            border-radius: 50%;
+            background: var(--success);
+
+            box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.1);
+        }
+
+        /* =========================
+           MAIN
+        ========================= */
+
+        main {
+            width: 88%;
+            max-width: 1400px;
+
+            margin: 35px auto;
+        }
+
+        .page-heading {
+            margin-bottom: 25px;
+        }
+
+        .page-heading h2 {
+            font-size: 28px;
+            font-weight: 750;
+        }
+
+        .page-heading p {
+            margin-top: 7px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        /* =========================
+           DASHBOARD GRID
+        ========================= */
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+
+            box-shadow:
+                0 4px 15px rgba(15, 23, 42, 0.04);
+        }
+
+        /* =========================
+           ORDER FORM
+        ========================= */
+
+        .order-card {
+            padding: 25px;
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .card-subtitle {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+
+            margin-bottom: 7px;
+        }
+
+        input,
+        select {
+            width: 100%;
+
+            padding: 12px 13px;
+
+            border: 1px solid #d7dce5;
+            border-radius: 9px;
+
+            font-size: 14px;
+            outline: none;
+
+            background: #ffffff;
+
+            transition: 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--primary);
+
+            box-shadow:
+                0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .submit-btn {
+            width: 100%;
+
+            border: none;
+            border-radius: 9px;
+
+            padding: 13px;
+
+            background: var(--primary);
+            color: white;
+
+            font-size: 14px;
+            font-weight: 650;
+
+            cursor: pointer;
+
+            transition: 0.2s;
+        }
+
+        .submit-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        /* =========================
+           RIGHT SIDE
+        ========================= */
+
+        .right-section {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* =========================
+           CURRENT TOKEN
+        ========================= */
+
+        .current-token {
+            padding: 28px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .current-info h3 {
+            font-size: 14px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .current-info p {
+            margin-top: 7px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .token-box {
+            min-width: 145px;
+
+            text-align: center;
+
+            padding: 18px 25px;
+
+            border-radius: 14px;
+
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+        }
+
+        .token-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .token-number {
+            margin-top: 3px;
+
+            font-size: 42px;
+            font-weight: 800;
+
+            color: var(--primary);
+
+            letter-spacing: 2px;
+        }
+
+        /* =========================
+           QUEUE
+        ========================= */
+
+        .queue-card {
+            overflow: hidden;
+        }
+
+        .queue-header {
+            padding: 20px 24px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            border-bottom: 1px solid var(--border);
+        }
+
+        .queue-header h3 {
+            font-size: 16px;
+        }
+
+        .queue-count {
+            background: #f1f5f9;
+
+            padding: 5px 10px;
+
+            border-radius: 20px;
+
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+
+            padding: 13px 20px;
+
+            font-size: 11px;
+
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+
+            color: var(--muted);
+
+            background: #f8fafc;
+
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 15px 20px;
+
+            font-size: 13px;
+
+            border-bottom: 1px solid #f0f1f4;
+        }
+
+        tbody tr:hover {
+            background: #fafcff;
+        }
+
+        .token-pill {
+            display: inline-flex;
+
+            min-width: 42px;
+            height: 30px;
+
+            padding: 0 8px;
+
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 7px;
+
+            background: #eff6ff;
+            color: var(--primary);
+
+            font-weight: 700;
+        }
+
+        .customer-name {
+            font-weight: 600;
+        }
+
+        .food-name {
+            color: var(--muted);
+        }
+
+        .status {
+            display: inline-flex;
+
+            padding: 5px 9px;
+
+            border-radius: 20px;
+
+            font-size: 11px;
+            font-weight: 650;
+        }
+
+        .status-serving {
+            color: #166534;
+            background: #dcfce7;
+        }
+
+        .status-waiting {
+            color: #92400e;
+            background: #fef3c7;
+        }
+
+        /* =========================
+           EMPTY STATE
+        ========================= */
+
+        .empty-state {
+            text-align: center;
+
+            padding: 45px 20px;
+
+            color: var(--muted);
+        }
+
+        .empty-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state h4 {
+            color: var(--text);
+            margin-bottom: 5px;
+        }
+
+        .empty-state p {
+            font-size: 13px;
+        }
+
+        /* =========================
+           FOOTER
+        ========================= */
+
+        footer {
+            width: 88%;
+            max-width: 1400px;
+
+            margin: 0 auto 25px;
+
+            display: flex;
+            justify-content: space-between;
+
+            color: var(--muted);
+
+            font-size: 11px;
+        }
+
+        /* =========================
+           RESPONSIVE
+        ========================= */
+
+        @media (max-width: 900px) {
+
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .order-card {
+                max-width: none;
+            }
+
+            .current-token {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 20px;
+            }
+
+            .token-box {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 600px) {
+
+            header {
+                padding: 0 5%;
+            }
+
+            .system-status {
+                display: none;
+            }
+
+            main {
+                width: 92%;
+                margin-top: 25px;
+            }
+
+            .page-heading h2 {
+                font-size: 23px;
+            }
+
+            footer {
+                width: 92%;
+            }
+
+            th,
+            td {
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+
+
+<body>
+
+    <!-- =========================================
+         HEADER
+    ========================================== -->
+
+    <header>
+
+        <div class="brand">
+
+            <div class="brand-icon">
+                C
+            </div>
+
+            <div class="brand-text">
+
+                <h1>Canteen Management</h1>
+
+                <p>Digital Token & Order Queue</p>
+
+            </div>
+
+        </div>
+
+
+        <div class="system-status">
+
+            <span class="status-dot"></span>
+
+            System Online
+
+        </div>
+
+    </header>
+
+
+    <!-- =========================================
+         MAIN
+    ========================================== -->
+
+    <main>
+
+        <div class="page-heading">
+
+            <h2>Order Management</h2>
+
+            <p>
+                Create customer orders and manage the serving queue.
+            </p>
+
+        </div>
+
+
+        <div class="dashboard">
+
+
+            <!-- =================================
+                 ORDER FORM
+            ================================== -->
+
+            <div class="card order-card">
+
+                <div class="card-title">
+                    New Order
+                </div>
+
+                <div class="card-subtitle">
+                    Enter customer details to generate a token.
+                </div>
+
+
+                <form method="POST">
+
+                    <div class="form-group">
+
+                        <label for="name">
+                            Customer Name
+                        </label>
+
+                        <input
+                            type="text"
+                            id="name"
+                            name="name"
+                            placeholder="Enter customer name"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label for="food">
+                            Food Item
+                        </label>
+
+                        <input
+                            type="text"
+                            id="food"
+                            name="food"
+                            placeholder="e.g. Burger, Pizza, Sandwich"
+                            required
+                        >
+
+                    </div>
+
+
+                    <button
+                        type="submit"
+                        class="submit-btn"
+                    >
+                        Generate Token
+                    </button>
+
+                </form>
+
+            </div>
+
+
+            <!-- =================================
+                 RIGHT SECTION
+            ================================== -->
+
+            <div class="right-section">
+
+
+                <!-- CURRENT TOKEN -->
+
+                <div class="card current-token">
+
+                    <div class="current-info">
+
+                        <h3>
+                            Currently Serving
+                        </h3>
+
+                        {% if current %}
+
+                        <p>
+                            Serving
+                            <strong>{{ current.name }}</strong>
+                            —
+                            {{ current.food }}
+                        </p>
+
+                        {% else %}
+
+                        <p>
+                            No active orders in the queue.
+                        </p>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    <div class="token-box">
+
+                        <div class="token-label">
+                            Token Number
+                        </div>
+
+                        <div class="token-number">
+
+                            {% if current %}
+                                {{ "%04d"|format(current.token) }}
+                            {% else %}
+                                ----
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================
+                     QUEUE
+                ================================== -->
+
+                <div class="card queue-card">
+
+                    <div class="queue-header">
+
+                        <h3>
+                            Order Queue
+                        </h3>
+
+                        <span class="queue-count">
+
+                            {{ orders|length }}
+                            {% if orders|length == 1 %}
+                                Order
+                            {% else %}
+                                Orders
+                            {% endif %}
+
+                        </span>
+
+                    </div>
+
+
+                    {% if orders %}
+
+                    <div class="table-wrapper">
+
+                        <table>
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>
+                                        Token
+                                    </th>
+
+                                    <th>
+                                        Customer
+                                    </th>
+
+                                    <th>
+                                        Food Item
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody>
+
+                                {% for order in orders %}
+
+                                <tr>
+
+                                    <td>
+
+                                        <span class="token-pill">
+
+                                            {{ "%04d"|format(order.token) }}
+
+                                        </span>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <span class="customer-name">
+
+                                            {{ order.name }}
+
+                                        </span>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <span class="food-name">
+
+                                            {{ order.food }}
+
+                                        </span>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        {% if loop.first %}
+
+                                        <span class="status status-serving">
+                                            Serving
+                                        </span>
+
+                                        {% else %}
+
+                                        <span class="status status-waiting">
+                                            Waiting
+                                        </span>
+
+                                        {% endif %}
+
+                                    </td>
+
+                                </tr>
+
+                                {% endfor %}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                    {% else %}
+
+                    <div class="empty-state">
+
+                        <div class="empty-icon">
+                            🍽️
+                        </div>
+
+                        <h4>
+                            Queue is empty
+                        </h4>
+
+                        <p>
+                            New customer orders will appear here.
+                        </p>
+
+                    </div>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <!-- =========================================
+         FOOTER
+    ========================================== -->
+
+    <footer>
+
+        <span>
+            Canteen Token Management System
+        </span>
+
+        <span>
+            Arduino + Flask
+        </span>
+
+    </footer>
+<script>
+
+async function updateQueue() {
+
+    try {
+
+        const response = await fetch("/api/queue");
+
+        const data = await response.json();
+
+
+        // =====================================
+        // UPDATE CURRENT TOKEN
+        // =====================================
+
+        const tokenElement =
+            document.querySelector(".token-number");
+
+        const currentInfo =
+            document.querySelector(".current-info");
+
+
+        if (data.current) {
+
+            tokenElement.textContent =
+                String(data.current.token).padStart(4, "0");
+
+            currentInfo.innerHTML = `
+                <h3>Currently Serving</h3>
+
+                <p>
+                    Serving
+                    <strong>${data.current.name}</strong>
+                    —
+                    ${data.current.food}
+                </p>
+            `;
+
+        } else {
+
+            tokenElement.textContent = "----";
+
+            currentInfo.innerHTML = `
+                <h3>Currently Serving</h3>
+
+                <p>
+                    No active orders in the queue.
+                </p>
+            `;
+        }
+
+
+        // =====================================
+        // UPDATE QUEUE COUNT
+        // =====================================
+
+        const queueCount =
+            document.querySelector(".queue-count");
+
+        queueCount.textContent =
+            `${data.orders.length} ${
+                data.orders.length === 1
+                    ? "Order"
+                    : "Orders"
+            }`;
+
+
+        // =====================================
+        // UPDATE TABLE
+        // =====================================
+
+        const tableBody =
+            document.querySelector("tbody");
+
+        if (!tableBody) {
+            return;
+        }
+
+
+        tableBody.innerHTML = "";
+
+
+        data.orders.forEach(order => {
+
+            let statusClass = "";
+
+            if (order.status === "Serving") {
+                statusClass = "status-serving";
+            }
+            else if (order.status === "Waiting") {
+                statusClass = "status-waiting";
+            }
+
+
+            const row = document.createElement("tr");
+
+
+            row.innerHTML = `
+
+                <td>
+
+                    <span class="token-pill">
+
+                        ${String(order.token).padStart(4, "0")}
+
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <span class="customer-name">
+
+                        ${order.name}
+
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <span class="food-name">
+
+                        ${order.food}
+
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <span class="status ${statusClass}">
+
+                        ${order.status}
+
+                    </span>
+
+                </td>
+
+            `;
+
+
+            tableBody.appendChild(row);
+
+        });
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Queue update error:",
+            error
+        );
+
+    }
+}
+
+
+// =====================================
+// CHECK EVERY 500ms
+// =====================================
+
+setInterval(updateQueue, 500);
+
+</script>
+</body>
+
+</html>

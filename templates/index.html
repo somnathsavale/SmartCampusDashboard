@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campus Smart Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #121b2a;
+      --panel-2: #17273b;
+      --line: #2a3d57;
+      --text: #edf6ff;
+      --muted: #9db0c6;
+      --green: #50d890;
+      --amber: #f5b942;
+      --red: #f76666;
+      --blue: #60a5fa;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(180deg, #0b1220 0%, #101d2f 100%);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 26px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab-btn {
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 10px 14px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid transparent;
+    }
+
+    .tab-btn:hover,
+    .tab-btn.active {
+      color: var(--text);
+      background: var(--panel-2);
+      border-color: var(--line);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .overview-lower {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 16px;
+    }
+
+    .link-list { display: grid; gap: 14px; }
+    .link-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .link-name { display: grid; gap: 4px; }
+    .link-name small, .chart-caption { color: var(--muted); }
+    .link-state { display: flex; align-items: center; gap: 7px; font-size: 0.85rem; }
+    .link-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); }
+    .link-dot.online { background: var(--green); box-shadow: 0 0 10px rgba(80,216,144,.4); }
+    .chart { height: 112px; display: flex; align-items: end; gap: 4px; padding-top: 12px; }
+    .chart-bar { flex: 1; min-width: 3px; background: var(--blue); border-radius: 3px 3px 0 0; opacity: .82; }
+    .chart-caption { margin-top: 8px; font-size: .85rem; }
+
+    h1 {
+      margin: 0;
+      font-size: 2.2rem;
+    }
+
+    .status-badge {
+      background: rgba(80, 216, 144, 0.12);
+      border: 1px solid rgba(80, 216, 144, 0.4);
+      color: var(--green);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .value {
+      margin-top: 12px;
+      font-size: 2.2rem;
+      font-weight: 700;
+    }
+
+    .sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .panel h2 {
+      margin: 0 0 16px;
+      font-size: 1.2rem;
+    }
+
+    .rows {
+      display: grid;
+      gap: 12px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+    }
+
+    .row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .state-good { color: var(--green); }
+    .state-warning { color: var(--amber); }
+    .state-error { color: var(--red); }
+
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0e1727;
+      color: var(--text);
+      margin-bottom: 12px;
+      font-size: 1rem;
+    }
+
+    button {
+      border: none;
+      background: var(--blue);
+      color: #0b1220;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+
+    button.secondary {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+
+    .notice {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(96, 165, 250, 0.15);
+      color: var(--blue);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 800px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .layout { grid-template-columns: 1fr; }
+      .overview-lower { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 480px) {
+      .container { padding: 16px; }
+      h1 { font-size: 1.6rem; }
+      .grid { gap: 10px; }
+      .card { padding: 14px; }
+      .value { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <h1>Campus Smart Dashboard</h1>
+      <div class="status-badge" id="systemBadge">Live</div>
+    </div>
+
+    <nav class="tabs" aria-label="Main navigation">
+      <button class="tab-btn active" data-tab="overview" type="button">Overview</button>
+      <button class="tab-btn" data-tab="irrigation" type="button">Irrigation</button>
+      <button class="tab-btn" data-tab="canteen" type="button">Canteen</button>
+      <button class="tab-btn" data-tab="waste" type="button">Dustbin</button>
+      <button class="tab-btn" data-tab="classroom" type="button">Classroom</button>
+    </nav>
+
+    <section id="overview" class="tab-panel active">
+      <div class="grid">
+        <div class="card">
+          <div class="label">Soil</div>
+          <div class="value" id="soilValue">--</div>
+          <div class="sub" id="soilStatus">Waiting</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Pump</div>
+          <div class="value" id="pumpValue">--</div>
+          <div class="sub" id="pumpStatus">Offline</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Canteen Queue</div>
+          <div class="value" id="queueValue">0</div>
+          <div class="sub">Active orders</div>
+        </div>
+
+        <div class="card">
+          <div class="label">People in Room</div>
+          <div class="value" id="peopleValue">0</div>
+          <div class="sub" id="roomStatus">Idle</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Dustbin Fill</div>
+          <div class="value" id="overviewBinValue">--</div>
+          <div class="sub" id="overviewBinStatus">Waiting for reading</div>
+        </div>
+      </div>
+
+      <div class="overview-lower">
+        <div class="card panel">
+          <h2>Board Links</h2>
+          <div class="link-list">
+            <div class="link-row">
+              <div class="link-name"><strong>COM5</strong><small>Irrigation · Canteen</small></div>
+              <span class="link-state"><i class="link-dot" id="com5Dot"></i><span id="com5Status">Waiting</span></span>
+            </div>
+            <div class="link-row">
+              <div class="link-name"><strong>COM6</strong><small>Dustbin · Classroom</small></div>
+              <span class="link-state"><i class="link-dot" id="com6Dot"></i><span id="com6Status">Waiting</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="card panel">
+          <h2>Soil Readings</h2>
+          <div class="chart" id="soilChart" role="img" aria-label="Recent soil sensor readings"></div>
+          <div class="chart-caption" id="soilChartCaption">Waiting for sensor readings</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="irrigation" class="tab-panel">
+      <div class="card panel">
+        <h2>Irrigation</h2>
+        <div class="rows">
+          <div class="row"><span>Soil Condition</span><strong id="soilCondition">Waiting</strong></div>
+          <div class="row"><span>Soil Reading</span><strong id="soilReading">--</strong></div>
+          <div class="row"><span>Pump State</span><strong id="pumpState">OFF</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="canteen" class="tab-panel">
+      <div class="card panel">
+        <h2>Canteen</h2>
+        <form id="orderForm">
+          <input id="customerInput" type="text" placeholder="Customer name" required>
+          <input id="foodInput" type="text" placeholder="Food item" required>
+          <button type="submit">Issue Token</button>
+          <button type="button" class="secondary" id="nextOrderButton">Complete Next</button>
+          <div class="notice" id="orderMessage">Waiting for order.</div>
+        </form>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Name</th>
+              <th>Food</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="queueTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="waste" class="tab-panel">
+      <div class="card panel">
+        <h2>Smart Dustbin</h2>
+        <div class="rows">
+          <div class="row"><span>Waste Fill</span><strong id="binFill">--</strong></div>
+          <div class="row"><span>Distance</span><strong id="binDistance">--</strong></div>
+          <div class="row"><span>Sensor</span><strong id="binSensorStatus">Waiting</strong></div>
+          <div class="row"><span>Fill Alert</span><strong id="binAlertStatus">Waiting</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="classroom" class="tab-panel">
+      <div class="card panel">
+        <h2>Classroom</h2>
+        <div class="rows">
+          <div class="row"><span>People</span><strong id="peopleCount">0</strong></div>
+          <div class="row"><span>Lights</span><strong id="lightState">OFF</strong></div>
+          <div class="row"><span>Fan</span><strong id="fanState">OFF</strong></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const soilHistory = [];
+    let lastSoilSeen = null;
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    function setStatus(id, value, level) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value;
+      el.classList.remove('state-good', 'state-warning', 'state-error');
+      if (level) el.classList.add(`state-${level}`);
+    }
+
+    function renderSoilHistory(soil) {
+      if (soil.soil_value != null && soil.last_seen && soil.last_seen !== lastSoilSeen) {
+        soilHistory.push({ value: Number(soil.soil_value), time: soil.last_seen });
+        if (soilHistory.length > 24) soilHistory.shift();
+        lastSoilSeen = soil.last_seen;
+      }
+
+      const chart = document.getElementById('soilChart');
+      chart.replaceChildren();
+      soilHistory.forEach((reading) => {
+        const bar = document.createElement('span');
+        bar.className = 'chart-bar';
+        bar.style.height = `${Math.max(5, Math.min(100, reading.value / 1023 * 100))}%`;
+        bar.title = `${reading.value} · ${new Date(reading.time).toLocaleTimeString()}`;
+        chart.appendChild(bar);
+      });
+      setText('soilChartCaption', soilHistory.length
+        ? `${soilHistory.length} recent readings · latest ${soilHistory[soilHistory.length - 1].value}`
+        : 'Waiting for sensor readings');
+    }
+
+    function renderOrders(orders) {
+      const tbody = document.getElementById('queueTable');
+      if (!orders || orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4">No orders yet</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = orders.map(order => {
+        return `<tr>
+          <td>${String(order.token).padStart(4, '0')}</td>
+          <td>${order.name || 'Guest'}</td>
+          <td>${order.food || 'Meal'}</td>
+          <td><span class="pill">${order.status || 'Waiting'}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderState(data) {
+      const soil = data.irrigation || {};
+      const canteen = data.canteen || {};
+      const dustbin = data.dustbin || {};
+      const room = data.classroom || {};
+      const current = canteen.current_order;
+
+      setText('soilValue', soil.soil_value ?? '--');
+      setText('soilStatus', soil.soil_status || 'Waiting');
+      setText('pumpValue', soil.pump ? 'ON' : 'OFF');
+      setText('pumpStatus', soil.pump ? 'Running' : 'Idle');
+      setText('queueValue', canteen.queue ?? 0);
+      setText('peopleValue', room.people ?? 0);
+      setText('roomStatus', (room.people ?? 0) > 0 ? 'Occupied' : 'Idle');
+      setText('overviewBinValue', dustbin.fill == null ? '--' : `${dustbin.fill}%`);
+      const binOverviewStatus = dustbin.sensor_status === 'Error'
+        ? 'Sensor error'
+        : dustbin.warning
+          ? 'Warning: 80% or more full'
+          : dustbin.fill == null
+            ? 'Waiting for reading'
+            : `Normal · ${dustbin.distance ?? '--'} cm`;
+      setStatus('overviewBinStatus', binOverviewStatus,
+        dustbin.sensor_status === 'Error' ? 'error' : dustbin.warning ? 'warning' : dustbin.fill == null ? null : 'good');
+
+      setText('soilCondition', soil.soil_status || 'Waiting');
+      setText('soilReading', soil.soil_value ?? '--');
+      setText('pumpState', soil.pump ? 'ON' : 'OFF');
+      setText('binFill', dustbin.fill == null ? '--' : `${dustbin.fill}%`);
+      setText('binDistance', dustbin.distance == null ? '--' : `${dustbin.distance} cm`);
+      const sensorStatus = dustbin.sensor_status || 'Waiting';
+      setStatus('binSensorStatus', sensorStatus === 'Error' ? 'Sensor error' : sensorStatus,
+        sensorStatus === 'Error' ? 'error' : sensorStatus === 'OK' ? 'good' : null);
+      setStatus('binAlertStatus', dustbin.warning ? '80% or more full' : dustbin.fill == null ? 'Waiting' : 'Normal',
+        dustbin.warning ? 'warning' : dustbin.fill == null ? null : 'good');
+      setText('peopleCount', room.people ?? 0);
+      setText('lightState', room.light ? 'ON' : 'OFF');
+      setText('fanState', room.fan ? 'ON' : 'OFF');
+
+      const connected = !!(soil.connected || canteen.connected || dustbin.connected || room.connected);
+      const badge = document.getElementById('systemBadge');
+      badge.textContent = connected ? 'Connected' : 'Waiting';
+      badge.style.color = connected ? '#50d890' : '#f5b942';
+      badge.style.borderColor = connected ? 'rgba(80,216,144,0.4)' : 'rgba(245,185,66,0.4)';
+      badge.style.background = connected ? 'rgba(80,216,144,0.12)' : 'rgba(245,185,66,0.12)';
+
+      const com5Connected = !!(soil.connected || canteen.connected);
+      const com6Connected = !!(dustbin.connected || room.connected);
+      setText('com5Status', com5Connected ? 'Connected' : 'Offline');
+      setText('com6Status', com6Connected ? 'Connected' : 'Offline');
+      document.getElementById('com5Dot').classList.toggle('online', com5Connected);
+      document.getElementById('com6Dot').classList.toggle('online', com6Connected);
+      renderSoilHistory(soil);
+
+      renderOrders(canteen.orders || []);
+
+      if (current) {
+        setText('orderMessage', `Currently serving token ${String(current.token).padStart(4, '0')} for ${current.name}.`);
+      } else if ((canteen.orders || []).length === 0) {
+        setText('orderMessage', 'Waiting for the next order.');
+      }
+    }
+
+    async function refreshState() {
+      try {
+        const response = await fetch('/api/state');
+        const data = await response.json();
+        renderState(data);
+      } catch (error) {
+        document.getElementById('systemBadge').textContent = 'Offline';
+        document.getElementById('systemBadge').style.color = '#f76666';
+      }
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(function (button) {
+      button.addEventListener('click', function () {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById(this.dataset.tab).classList.add('active');
+      });
+    });
+
+    document.getElementById('orderForm').addEventListener('submit', async function (event) {
+      event.preventDefault();
+      const name = document.getElementById('customerInput').value.trim();
+      const food = document.getElementById('foodInput').value.trim();
+
+      if (!name || !food) {
+        document.getElementById('orderMessage').textContent = 'Please enter customer and food.';
+        return;
+      }
+
+      const response = await fetch('/api/canteen/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, food })
+      });
+
+      const result = await response.json();
+      if (result.ok) {
+        document.getElementById('orderMessage').textContent = `Token ${String(result.order.token).padStart(4, '0')} issued.`;
+        document.getElementById('orderForm').reset();
+      } else {
+        document.getElementById('orderMessage').textContent = 'Order could not be created.';
+      }
+
+      refreshState();
+    });
+
+    document.getElementById('nextOrderButton').addEventListener('click', async function () {
+      await fetch('/api/canteen/next', { method: 'POST' });
+      refreshState();
+    });
+
+    refreshState();
+    setInterval(refreshState, 3000);
+  </script>
+</body>
+</html>
+

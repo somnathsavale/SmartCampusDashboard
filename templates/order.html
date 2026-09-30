@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18392f">
+  <title>Place a Canteen Order</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #1d2925;
+      --muted: #65736d;
+      --paper: #f1f4ef;
+      --white: #fff;
+      --green: #18392f;
+      --green-light: #e0eee5;
+      --tomato: #c44732;
+      --line: #dce3dc;
+      --gold: #e7b54b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image: repeating-linear-gradient(135deg, transparent 0 31px, rgba(24, 57, 47, .025) 31px 32px);
+      font-family: "DM Sans", "Segoe UI", sans-serif;
+    }
+
+    .topbar {
+      height: 76px;
+      padding: 0 max(6vw, 24px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #f7f8f2;
+      background: var(--green);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, .32);
+      border-radius: 50%;
+      color: var(--gold);
+      font-family: Georgia, serif;
+      font-size: 20px;
+    }
+
+    .brand-name { font-size: 14px; font-weight: 700; }
+    .brand-caption { margin-top: 2px; color: #bacac1; font-size: 11px; }
+
+    .open-label {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: #dce9df;
+      font-size: 12px;
+    }
+
+    .open-dot { width: 8px; height: 8px; border-radius: 50%; background: #8bd39b; }
+
+    main {
+      width: min(1080px, calc(100% - 48px));
+      margin: 64px auto 56px;
+      display: grid;
+      grid-template-columns: minmax(0, .92fr) minmax(390px, 1.08fr);
+      align-items: center;
+      gap: clamp(36px, 7vw, 92px);
+      animation: arrive .55s ease-out both;
+    }
+
+    .intro { padding: 12px 0 30px; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--tomato);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before { width: 26px; height: 2px; content: ""; background: var(--tomato); }
+
+    h1 {
+      max-width: 460px;
+      margin: 20px 0 17px;
+      font-family: Fraunces, Georgia, serif;
+      font-size: clamp(42px, 5vw, 66px);
+      font-weight: 600;
+      line-height: 1.02;
+    }
+
+    .intro-copy { max-width: 375px; color: var(--muted); font-size: 15px; line-height: 1.75; }
+
+    .order-steps {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      margin-top: 38px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .step-number {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #bac8be;
+      border-radius: 50%;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .step-rule { width: 34px; height: 1px; background: #cbd5cc; }
+
+    .order-panel {
+      position: relative;
+      padding: clamp(26px, 4vw, 42px);
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--tomato);
+      background: var(--white);
+      box-shadow: 0 18px 54px rgba(26, 47, 37, .09);
+    }
+
+    .panel-heading { margin: 0; font-family: Fraunces, Georgia, serif; font-size: 28px; font-weight: 600; }
+    .panel-copy { margin: 8px 0 28px; color: var(--muted); font-size: 13px; }
+
+    .field { margin-top: 19px; }
+    label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; }
+
+    input {
+      width: 100%;
+      min-height: 50px;
+      padding: 0 14px;
+      border: 1px solid #cfd8d0;
+      border-radius: 3px;
+      outline: none;
+      background: #fcfdfb;
+      color: var(--ink);
+      font: inherit;
+      font-size: 14px;
+      transition: border-color .16s, box-shadow .16s;
+    }
+
+    input::placeholder { color: #98a49c; }
+    input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(24, 57, 47, .1); }
+
+    .submit-button {
+      width: 100%;
+      min-height: 52px;
+      margin-top: 27px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 17px;
+      border: 0;
+      border-radius: 3px;
+      color: white;
+      background: var(--tomato);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .16s, transform .16s;
+    }
+
+    .submit-button:hover { background: #a93827; transform: translateY(-1px); }
+    .submit-button:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+    .arrow { font-size: 19px; font-weight: 400; }
+
+    .fine-print { margin: 15px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+    .message { margin-top: 20px; padding: 16px; border-left: 3px solid var(--tomato); background: #fff1ed; }
+    .message.error { color: #892d20; font-size: 13px; line-height: 1.5; }
+    .receipt { border-color: var(--green); background: var(--green-light); }
+    .receipt-label { color: var(--green); font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .receipt-token { margin: 4px 0; color: var(--green); font-family: Fraunces, Georgia, serif; font-size: 38px; line-height: 1; }
+    .receipt-detail { color: #415a4d; font-size: 12px; line-height: 1.6; }
+
+    footer {
+      width: min(1080px, calc(100% - 48px));
+      margin: 0 auto;
+      padding: 18px 0 24px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      border-top: 1px solid #d8e0d8;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    @keyframes arrive { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 760px) {
+      .topbar { height: 68px; padding: 0 20px; }
+      main { width: min(540px, calc(100% - 36px)); margin: 37px auto 42px; grid-template-columns: 1fr; gap: 25px; }
+      .intro { padding: 0; }
+      h1 { max-width: 380px; margin: 14px 0 10px; font-size: clamp(40px, 12vw, 56px); }
+      .intro-copy { font-size: 14px; }
+      .order-steps { margin-top: 20px; }
+      .order-panel { padding: 25px 22px; }
+      footer { width: calc(100% - 36px); }
+    }
+
+    @media (max-width: 400px) {
+      .brand-caption { display: none; }
+      .open-label { font-size: 11px; }
+      footer { flex-direction: column; gap: 5px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="Campus Canteen">
+      <div class="brand-mark" aria-hidden="true">C</div>
+      <div>
+        <div class="brand-name">Campus Canteen</div>
+        <div class="brand-caption">Fresh food, ready for your break</div>
+      </div>
+    </div>
+    <div class="open-label"><span class="open-dot" aria-hidden="true"></span>Order desk open</div>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <div class="eyebrow">Canteen orders</div>
+      <h1 id="page-title">Good food.<br>Less waiting.</h1>
+      <p class="intro-copy">Place your order before the rush. We’ll give you a token to follow when it’s your turn.</p>
+      <div class="order-steps" aria-label="Order, get a token, collect">
+        <span class="step-number">1</span><span>Order</span>
+        <span class="step-rule" aria-hidden="true"></span>
+        <span class="step-number">2</span><span>Get token</span>
+        <span class="step-rule" aria-hidden="true"></span>
+        <span class="step-number">3</span><span>Collect</span>
+      </div>
+    </section>
+
+    <section class="order-panel" aria-labelledby="form-title">
+      <h2 class="panel-heading" id="form-title">Place an order</h2>
+      <p class="panel-copy">Tell us what you’d like and who to call.</p>
+      <form method="post" action="/">
+        <div class="field">
+          <label for="name">Your name</label>
+          <input id="name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="e.g. Alex Morgan" required>
+        </div>
+        <div class="field">
+          <label for="food">Food item</label>
+          <input id="food" name="food" type="text" maxlength="120" placeholder="e.g. Veg sandwich" required>
+        </div>
+        <button class="submit-button" type="submit"><span>Send order</span><span class="arrow" aria-hidden="true">→</span></button>
+        <p class="fine-print">Your token appears here after the canteen accepts your order.</p>
+      </form>
+
+      {% if error %}
+      <div class="message error" role="alert">{{ error }}</div>
+      {% endif %}
+      {% if order %}
+      <div class="message receipt" role="status" aria-live="polite">
+        <div class="receipt-label">Order accepted · {{ order.status }}</div>
+        <div class="receipt-token">#{{ "%04d"|format(order.token) }}</div>
+        <div class="receipt-detail">{{ order.name }} · {{ order.food }}<br>Orders ahead: {{ queue_ahead }}</div>
+      </div>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer><span>Campus Canteen</span><span>Order tokens are served in sequence.</span></footer>
+</body>
+</html>

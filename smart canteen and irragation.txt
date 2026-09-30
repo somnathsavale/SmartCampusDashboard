@@ -1,0 +1,343 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <TM1637Display.h>
+
+// =====================================================
+// LCD
+// =====================================================
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+
+// =====================================================
+// SOIL SENSOR + RELAY
+// =====================================================
+
+#define SOIL_PIN A0
+#define RELAY_PIN 7
+
+int soilValue;
+
+
+// =====================================================
+// TM1637
+// =====================================================
+
+#define CLK 8
+#define DIO 6
+
+TM1637Display display(CLK, DIO);
+
+
+// =====================================================
+// BUZZER
+// =====================================================
+
+#define BUZZER 10
+
+
+// =====================================================
+// PUSH BUTTON
+// =====================================================
+
+#define BUTTON 11
+
+
+// =====================================================
+// SOIL STATUS
+// =====================================================
+
+int lastStatus = -1;
+
+// 0 = WET
+// 1 = MEDIUM
+// 2 = DRY
+
+
+// =====================================================
+// SETUP
+// =====================================================
+
+void setup()
+{
+  Serial.begin(9600);
+
+  // ---------------------------------------------------
+  // Soil sensor
+  // ---------------------------------------------------
+
+  pinMode(SOIL_PIN, INPUT);
+
+
+  // ---------------------------------------------------
+  // Relay
+  // ---------------------------------------------------
+
+  pinMode(RELAY_PIN, OUTPUT);
+
+  // Relay OFF at start
+  // Active LOW relay
+  digitalWrite(RELAY_PIN, HIGH);
+
+
+  // ---------------------------------------------------
+  // LCD
+  // ---------------------------------------------------
+
+  lcd.init();
+  lcd.backlight();
+
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("SMART SYSTEM");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Starting...");
+
+  delay(2000);
+
+  lcd.clear();
+
+
+  // ---------------------------------------------------
+  // TM1637
+  // ---------------------------------------------------
+
+  display.setBrightness(7);
+  display.clear();
+
+
+  // ---------------------------------------------------
+  // Buzzer
+  // ---------------------------------------------------
+
+  pinMode(BUZZER, OUTPUT);
+
+  // Active LOW buzzer
+  digitalWrite(BUZZER, HIGH);
+
+
+  // ---------------------------------------------------
+  // Push button
+  // ---------------------------------------------------
+
+  pinMode(BUTTON, INPUT_PULLUP);
+
+
+  Serial.println("Arduino Ready");
+}
+
+
+// =====================================================
+// MAIN LOOP
+// =====================================================
+
+void loop()
+{
+  // ===================================================
+  // 1. READ SOIL SENSOR
+  // ===================================================
+
+  soilValue = analogRead(SOIL_PIN);
+
+  Serial.print("Soil Value = ");
+  Serial.println(soilValue);
+
+
+  // ===================================================
+  // 2. DETERMINE SOIL STATUS
+  // ===================================================
+
+  int currentStatus;
+
+
+  if (soilValue > 700)
+  {
+    // ================================================
+    // DRY
+    // ================================================
+
+    currentStatus = 2;
+
+    // Pump ON
+    digitalWrite(RELAY_PIN, LOW);
+  }
+
+  else if (soilValue > 400)
+  {
+    // ================================================
+    // MEDIUM
+    // ================================================
+
+    currentStatus = 1;
+
+    // Pump OFF
+    digitalWrite(RELAY_PIN, HIGH);
+  }
+
+  else
+  {
+    // ================================================
+    // WET
+    // ================================================
+
+    currentStatus = 0;
+
+    // Pump OFF
+    digitalWrite(RELAY_PIN, HIGH);
+  }
+
+
+  // ===================================================
+  // 3. UPDATE LCD ONLY WHEN STATUS CHANGES
+  // ===================================================
+
+  if (currentStatus != lastStatus)
+  {
+    lcd.clear();
+
+    if (currentStatus == 2)
+    {
+      // ----------------------------------------------
+      // DRY
+      // ----------------------------------------------
+
+      lcd.setCursor(0, 0);
+      lcd.print("Soil: DRY");
+
+      lcd.setCursor(0, 1);
+      lcd.print("Pump: ON");
+
+      Serial.println("SOIL DRY");
+      Serial.println("PUMP ON");
+    }
+
+    else if (currentStatus == 1)
+    {
+      // ----------------------------------------------
+      // MEDIUM
+      // ----------------------------------------------
+
+      lcd.setCursor(0, 0);
+      lcd.print("Soil: MEDIUM");
+
+      lcd.setCursor(0, 1);
+      lcd.print("Pump: OFF");
+
+      Serial.println("SOIL MEDIUM");
+      Serial.println("PUMP OFF");
+    }
+
+    else
+    {
+      // ----------------------------------------------
+      // WET
+      // ----------------------------------------------
+
+      lcd.setCursor(0, 0);
+      lcd.print("Soil: WET");
+
+      lcd.setCursor(0, 1);
+      lcd.print("Pump: OFF");
+
+      Serial.println("SOIL WET");
+      Serial.println("PUMP OFF");
+    }
+
+    // Save current status
+    lastStatus = currentStatus;
+  }
+
+
+  // ===================================================
+  // 4. RECEIVE COMMAND FROM FLASK / PYTHON
+  // ===================================================
+
+  if (Serial.available() > 0)
+  {
+    String command = Serial.readStringUntil('\n');
+
+    command.trim();
+
+
+    // -----------------------------------------------
+    // DISPLAY TOKEN
+    // -----------------------------------------------
+
+    if (command.startsWith("DISPLAY:"))
+    {
+      int token = command.substring(8).toInt();
+
+      Serial.print("Displaying Token: ");
+      Serial.println(token);
+
+      display.showNumberDec(token, true);
+
+      // Beep for new order
+      beep();
+    }
+
+
+    // -----------------------------------------------
+    // EMPTY QUEUE
+    // -----------------------------------------------
+
+    else if (command == "EMPTY")
+    {
+      display.clear();
+
+      Serial.println("Queue Empty");
+    }
+  }
+
+
+  // ===================================================
+  // 5. PUSH BUTTON
+  // ===================================================
+
+  static bool previousButton = HIGH;
+
+  bool currentButton = digitalRead(BUTTON);
+
+
+  if (previousButton == HIGH && currentButton == LOW)
+  {
+    Serial.println("NEXT");
+
+    // Beep
+    beep();
+
+    // Debounce
+    delay(300);
+
+    // Wait until button released
+    while (digitalRead(BUTTON) == LOW)
+    {
+      delay(10);
+    }
+  }
+
+
+  previousButton = currentButton;
+
+
+  // Small delay
+  delay(100);
+}
+
+
+// =====================================================
+// BUZZER FUNCTION
+// =====================================================
+
+void beep()
+{
+  // Active LOW buzzer
+
+  digitalWrite(BUZZER, LOW);
+
+  delay(300);
+
+  digitalWrite(BUZZER, HIGH);
+}
