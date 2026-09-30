@@ -24,6 +24,7 @@ except ImportError:
 
 app = Flask(__name__)
 DB_PATH = os.environ.get("SMART_DB", os.path.join(os.path.dirname(__file__), "smart_dashboard.db"))
+CANTEEN_ORDER_URL = os.environ.get("CANTEEN_ORDER_URL", "http://127.0.0.1:8000").rstrip("/")
 SERIAL_BAUD = int(os.environ.get("SMART_BAUD", "9600"))
 MQTT_HOST = os.environ.get("MQTT_HOST", "")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
@@ -332,7 +333,7 @@ def start_serial_detection_for_flask():
 
 @app.route("/")
 def index():
-	return render_template("index.html")
+	return render_template("index.html", canteen_order_url=CANTEEN_ORDER_URL)
 
 @app.get("/api/state")
 def api_state():

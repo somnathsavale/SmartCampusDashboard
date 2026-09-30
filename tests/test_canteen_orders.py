@@ -58,6 +58,16 @@ class CanteenOrderPersistenceTests(unittest.TestCase):
             db.close()
         self.assertEqual(saved, [(1, "Alex", "Soup", "Completed"), (2, "Sam", "Salad", "Serving")])
 
+    def test_dashboard_canteen_section_links_to_configured_customer_page(self):
+        with patch.object(dashboard, "start_serial_detection_once"), patch.object(
+            dashboard, "CANTEEN_ORDER_URL", "https://orders.example.test"
+        ):
+            response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'href="https://orders.example.test"', response.data)
+        self.assertIn(b"Open customer order page", response.data)
+
 
 if __name__ == "__main__":
     unittest.main()

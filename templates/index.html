@@ -196,6 +196,25 @@
       border: 1px solid var(--line);
     }
 
+    .order-page-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 22px;
+      margin: 0 0 16px;
+      padding: 11px 15px;
+      border: 1px solid rgba(80, 216, 144, 0.4);
+      border-radius: 8px;
+      background: rgba(80, 216, 144, 0.12);
+      color: var(--green);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .order-page-link:hover { background: rgba(80, 216, 144, 0.2); }
+    .order-page-link:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+
     .notice {
       margin-top: 10px;
       color: var(--muted);
@@ -330,6 +349,10 @@
     <section id="canteen" class="tab-panel">
       <div class="card panel">
         <h2>Canteen</h2>
+        <a class="order-page-link" href="{{ canteen_order_url }}" target="_blank" rel="noopener noreferrer">
+          <span>Open customer order page</span>
+          <span aria-hidden="true">&#8599;</span>
+        </a>
         <form id="orderForm">
           <input id="customerInput" type="text" placeholder="Customer name" required>
           <input id="foodInput" type="text" placeholder="Food item" required>
