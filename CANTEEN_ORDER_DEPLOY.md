@@ -19,4 +19,6 @@ Deploy the dashboard and customer app as separate web services from this reposit
 
 Set `CANTEEN_DASHBOARD_URL` on the customer service to the dashboard's reachable service URL, without an API path. Set `SMART_DB` on the dashboard to a path on persistent storage provided by the host. Keep the customer service pointed at that dashboard service so orders continue to enter the dashboard's database and queue. SQLite requires persistent storage attached to the dashboard service; do not point the customer service at a second local database file.
 
+On Vercel, the dashboard stores SQLite in the function's writable temporary directory because the deployment filesystem is read-only. Vercel temporary storage can be cleared on cold starts and is not durable; use a managed database or a host with a persistent disk if orders must survive restarts or scale across function instances.
+
 Set `CANTEEN_ORDER_URL` on the dashboard service to the customer service's public URL so the dashboard's Canteen tab opens the deployed order page. It defaults to `http://127.0.0.1:8000` for local development.
