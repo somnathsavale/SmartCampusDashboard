@@ -68,7 +68,7 @@ class CanteenOrderPersistenceTests(unittest.TestCase):
         self.assertIn(b'href="https://orders.example.test"', response.data)
         self.assertIn(b"Open customer order page", response.data)
 
-    def test_canteen_arduino_command_waits_for_authenticated_bridge_ack(self):
+    def test_bridge_display_endpoint_tracks_serving_order_without_queueing_commands(self):
         headers = {"Authorization": "Bearer bridge-secret"}
         with patch.object(dashboard, "ARDUINO_BRIDGE_TOKEN", "bridge-secret"), patch.object(
             dashboard, "serial_connections", {}
@@ -78,17 +78,13 @@ class CanteenOrderPersistenceTests(unittest.TestCase):
             order = self.client.post(
                 "/api/canteen/orders", json={"name": "Alex", "food": "Soup"}
             )
+            display = self.client.get("/api/bridge/display", headers=headers)
             commands = self.client.get("/api/bridge/commands?board=canteen", headers=headers)
-            command_id = commands.json["commands"][0]["id"]
-            acknowledged = self.client.post(
-                f"/api/bridge/commands/{command_id}/ack", headers=headers
-            )
-            remaining = self.client.get("/api/bridge/commands?board=canteen", headers=headers)
 
         self.assertEqual(order.status_code, 200)
-        self.assertEqual(commands.json["commands"][0]["command"], "DISPLAY:1")
-        self.assertEqual(acknowledged.status_code, 200)
-        self.assertEqual(remaining.json["commands"], [])
+        self.assertEqual(display.status_code, 200)
+        self.assertEqual(display.json, {"token": 1})
+        self.assertEqual(commands.json["commands"], [])
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ Set `CANTEEN_ORDER_URL` on the dashboard service to the customer service's publi
 
 ## Connect Arduino boards to the deployed dashboard
 
-A cloud service cannot read USB serial ports on your computer. Run `mqtt_bridge.py` on the computer connected to the Arduino; HTTP mode forwards readings to the dashboard's public API and polls for canteen display commands. No MQTT broker is needed for HTTP mode.
+A cloud service cannot read USB serial ports on your computer. Run `mqtt_bridge.py` on the computer connected to the Arduino; HTTP mode forwards readings to the dashboard's public API and reconciles the TM1637 display to the current Serving order. It clears the display only after the queue stays empty for five seconds. No MQTT broker is needed for HTTP mode.
 
 Configure the dashboard service with:
 

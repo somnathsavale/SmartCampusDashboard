@@ -23,6 +23,18 @@ class ConnectionSummaryTests(unittest.TestCase):
 
 
 class ModuleTelemetryTests(unittest.TestCase):
+    def test_canteen_parses_displayed_token_and_queue_empty_messages(self):
+        with patch("app.add_event"), patch("app.update_module") as update_module:
+            parse_line("Displaying Token: 42", "canteen")
+            parse_line("Queue Empty", "canteen")
+
+        self.assertEqual(update_module.call_args_list[0].args, (
+            "canteen", {"displayed_token": 42}
+        ))
+        self.assertEqual(update_module.call_args_list[1].args, (
+            "canteen", {"displayed_token": None}
+        ))
+
     def test_irrigation_parses_explicit_soil_condition_and_pump_lines(self):
         with patch("app.add_event"), patch("app.update_module") as update_module:
             parse_line("SOIL MEDIUM", "irrigation")

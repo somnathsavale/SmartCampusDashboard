@@ -54,7 +54,7 @@ logs = deque(maxlen=80)
 orders = []
 state = {
 	"irrigation": {"soil_value": None, "soil_status": "Waiting", "pump": False, "connected": False, "last_seen": None, "last_message": "Waiting for serial data"},
-	"canteen": {"queue": 0, "current_order": None, "orders_served": 0, "orders": [], "connected": False, "last_seen": None},
+	"canteen": {"queue": 0, "current_order": None, "displayed_token": None, "orders_served": 0, "orders": [], "connected": False, "last_seen": None},
 	"dustbin": {"fill": None, "distance": None, "sensor_status": "Waiting", "warning": False, "connected": False, "last_seen": None},
 	"classroom": {"people": 0, "light": False, "fan": False, "connected": False, "last_seen": None},
 }
@@ -287,8 +287,7 @@ def send_serial_command(port, command):
 		if mqtt_publish_command("canteen", command):
 			return
 		if ARDUINO_BRIDGE_TOKEN:
-			enqueue_bridge_command("canteen", command)
-			add_event("info", "canteen", "Queued Arduino command for the local bridge")
+			return
 		else:
 			add_event("warning", "canteen", f"Could not send command: {port} is not connected and MQTT is unavailable")
 		return
@@ -320,6 +319,12 @@ def parse_line(line, board):
 			update_module("irrigation", {"pump": False})
 	elif board == "canteen" and "next" in lower:
 		serve_next_order()
+	elif board == "canteen":
+		match = re.search(r"displaying token:\s*(\d+)", lower)
+		if match:
+			update_module("canteen", {"displayed_token": int(match.group(1))})
+		elif "queue empty" in lower:
+			update_module("canteen", {"displayed_token": None})
 	elif board == "dustbin":
 		if "dustbin sensor error" in lower:
 			update_module("dustbin", {"sensor_status": "Error", "warning": False})
@@ -541,6 +546,13 @@ def api_bridge_commands():
 			(board,),
 		).fetchall()
 	return jsonify({"commands": [{"id": row[0], "command": row[1]} for row in rows]})
+
+@app.get("/api/bridge/display")
+def api_bridge_display():
+	if not bridge_authorized():
+		return jsonify({"error": "Unauthorized"}), 401
+	order = next((item for item in load_active_orders() if item["status"] == "Serving"), None)
+	return jsonify({"token": order["token"] if order else None})
 
 @app.post("/api/bridge/commands/<int:command_id>/ack")
 def api_bridge_command_ack(command_id):

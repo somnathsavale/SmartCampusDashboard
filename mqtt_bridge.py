@@ -130,23 +130,31 @@ def serial_worker(port, boards, client):
 
 def command_worker():
     port = BOARD_PORTS["canteen"]
+    unknown_token = object()
+    last_token = unknown_token
+    empty_since = None
     while True:
         try:
             with connections_lock:
                 connection = connections.get(port)
                 if connection is not None and connection.is_open:
-                    response = dashboard_request("/api/bridge/commands?board=canteen")
-                    for item in response.get("commands", []):
-                        command = item.get("command", "")
-                        if command != "EMPTY" and not command.startswith("DISPLAY:"):
-                            continue
-                        if command.startswith("DISPLAY:") and not command.removeprefix("DISPLAY:").isdigit():
-                            continue
-                        connection.write(f"{command}\n".encode("utf-8"))
-                        dashboard_request(
-                            f"/api/bridge/commands/{int(item['id'])}/ack",
-                            method="POST",
-                        )
+                    response = dashboard_request("/api/bridge/display")
+                    token = response.get("token")
+                    if token is not None and str(token).isdigit():
+                        token = int(token)
+                        empty_since = None
+                        if token != last_token:
+                            connection.write(f"DISPLAY:{token}\n".encode("utf-8"))
+                            last_token = token
+                            print(f"Displayed active canteen token {token}")
+                    elif last_token is not unknown_token:
+                        if empty_since is None:
+                            empty_since = time.monotonic()
+                        elif time.monotonic() - empty_since >= 5:
+                            connection.write(b"EMPTY\n")
+                            print("Cleared canteen display after queue stayed empty")
+                            last_token = None
+                            empty_since = None
         except Exception as exc:
             print(f"Could not check dashboard commands: {exc}")
         time.sleep(1)

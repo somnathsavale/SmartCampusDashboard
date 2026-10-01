@@ -388,6 +388,9 @@
     <section id="canteen" class="tab-panel">
       <div class="card panel">
         <h2>Canteen</h2>
+        <div class="rows">
+          <div class="row"><span>Token on Arduino</span><strong id="displayedToken">Waiting</strong></div>
+        </div>
         <a class="order-page-link" href="{{ canteen_order_url }}" target="_blank" rel="noopener noreferrer">
           <span>Open customer order page</span>
           <span aria-hidden="true">&#8599;</span>
@@ -504,6 +507,8 @@
       const room = data.classroom || {};
       const current = canteen.current_order;
 
+      setText('displayedToken', canteen.displayed_token == null
+        ? 'No token reported' : `#${String(canteen.displayed_token).padStart(4, '0')}`);
       setText('soilValue', soil.soil_value ?? '--');
       setText('soilStatus', soil.soil_status || 'Waiting');
       setText('pumpValue', soil.pump ? 'ON' : 'OFF');
