@@ -23,6 +23,16 @@ class ConnectionSummaryTests(unittest.TestCase):
 
 
 class ModuleTelemetryTests(unittest.TestCase):
+    def test_irrigation_parses_explicit_soil_condition_and_pump_lines(self):
+        with patch("app.add_event"), patch("app.update_module") as update_module:
+            parse_line("SOIL MEDIUM", "irrigation")
+            parse_line("SOIL WET", "irrigation")
+            parse_line("PUMP OFF", "irrigation")
+
+        self.assertEqual(update_module.call_args_list[0].args, ("irrigation", {"soil_status": "Medium"}))
+        self.assertEqual(update_module.call_args_list[1].args, ("irrigation", {"soil_status": "Wet"}))
+        self.assertEqual(update_module.call_args_list[2].args, ("irrigation", {"pump": False}))
+
     def test_classroom_parses_colon_formatted_relay_states(self):
         with patch("app.add_event"), patch("app.update_module") as update_module:
             parse_line("LIGHT: ON", "classroom")

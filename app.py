@@ -306,6 +306,12 @@ def parse_line(line, board):
 		if match:
 			value = int(match.group(1))
 			update_module("irrigation", {"soil_value": value, "soil_status": "Dry" if value > 700 else "Medium" if value > 400 else "Wet", "pump": value > 700})
+		elif "soil dry" in lower:
+			update_module("irrigation", {"soil_status": "Dry"})
+		elif "soil medium" in lower:
+			update_module("irrigation", {"soil_status": "Medium"})
+		elif "soil wet" in lower:
+			update_module("irrigation", {"soil_status": "Wet"})
 		elif "pump on" in lower:
 			update_module("irrigation", {"pump": True})
 		elif "pump off" in lower:

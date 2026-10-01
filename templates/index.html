@@ -84,6 +84,32 @@
     .chart { height: 112px; display: flex; align-items: end; gap: 4px; padding-top: 12px; }
     .chart-bar { flex: 1; min-width: 3px; background: var(--blue); border-radius: 3px 3px 0 0; opacity: .82; }
     .chart-caption { margin-top: 8px; font-size: .85rem; }
+    .soil-scale {
+      position: relative;
+      display: grid;
+      grid-template-columns: 400fr 300fr 323fr;
+      height: 12px;
+      margin: 12px 0 6px;
+      border-radius: 6px;
+      background: var(--panel-2);
+    }
+    .soil-scale span:first-child { background: var(--green); border-radius: 6px 0 0 6px; }
+    .soil-scale span:nth-child(2) { background: var(--amber); }
+    .soil-scale span:nth-child(3) { background: var(--red); border-radius: 0 6px 6px 0; }
+    .soil-marker {
+      position: absolute;
+      top: -4px;
+      left: 0;
+      width: 4px;
+      height: 20px;
+      border: 1px solid white;
+      border-radius: 2px;
+      background: #101d2f;
+      transform: translateX(-50%);
+    }
+    .soil-scale-labels { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .78rem; }
+    .reading-age { color: var(--muted); font-size: .85rem; }
+    .irrigation-live { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
 
     h1 {
       margin: 0;
@@ -338,11 +364,22 @@
     <section id="irrigation" class="tab-panel">
       <div class="card panel">
         <h2>Irrigation</h2>
+        <div class="irrigation-live">
+          <span>Board connection</span>
+          <strong id="irrigationLink">Waiting</strong>
+        </div>
         <div class="rows">
           <div class="row"><span>Soil Condition</span><strong id="soilCondition">Waiting</strong></div>
-          <div class="row"><span>Soil Reading</span><strong id="soilReading">--</strong></div>
+          <div class="row"><span>Sensor Reading (ADC)</span><strong id="soilReading">--</strong></div>
           <div class="row"><span>Pump State</span><strong id="pumpState">OFF</strong></div>
+          <div class="row"><span>Last Sensor Update</span><strong class="reading-age" id="soilUpdatedAt">No reading yet</strong></div>
         </div>
+        <div class="soil-scale" role="meter" aria-label="Soil sensor ADC reading from wet to dry" aria-valuemin="0" aria-valuemax="1023" aria-valuenow="0" id="soilScale">
+          <span></span><span></span><span></span><i class="soil-marker" id="soilMarker"></i>
+        </div>
+        <div class="soil-scale-labels"><span>Wet · 0–400</span><span>Medium · 401–700</span><span>Dry · 701–1023</span></div>
+        <div class="chart-caption">Recent ADC readings</div>
+        <div class="chart" id="irrigationSoilChart" role="img" aria-label="Recent irrigation soil sensor readings"></div>
       </div>
     </section>
 
@@ -425,12 +462,16 @@
 
       const chart = document.getElementById('soilChart');
       chart.replaceChildren();
+      const irrigationChart = document.getElementById('irrigationSoilChart');
+      irrigationChart.replaceChildren();
       soilHistory.forEach((reading) => {
-        const bar = document.createElement('span');
-        bar.className = 'chart-bar';
-        bar.style.height = `${Math.max(5, Math.min(100, reading.value / 1023 * 100))}%`;
-        bar.title = `${reading.value} · ${new Date(reading.time).toLocaleTimeString()}`;
-        chart.appendChild(bar);
+        [chart, irrigationChart].forEach(target => {
+          const bar = document.createElement('span');
+          bar.className = 'chart-bar';
+          bar.style.height = `${Math.max(5, Math.min(100, reading.value / 1023 * 100))}%`;
+          bar.title = `${reading.value} · ${new Date(reading.time).toLocaleTimeString()}`;
+          target.appendChild(bar);
+        });
       });
       setText('soilChartCaption', soilHistory.length
         ? `${soilHistory.length} recent readings · latest ${soilHistory[soilHistory.length - 1].value}`
@@ -482,6 +523,19 @@
       setText('soilCondition', soil.soil_status || 'Waiting');
       setText('soilReading', soil.soil_value ?? '--');
       setText('pumpState', soil.pump ? 'ON' : 'OFF');
+      const soilAgeMs = soil.last_seen ? Date.now() - new Date(soil.last_seen).getTime() : Infinity;
+      const soilIsLive = !!soil.connected && soilAgeMs >= 0 && soilAgeMs < 10000;
+      setStatus('irrigationLink', soilIsLive ? 'Live' : soil.connected ? 'Stale' : 'Offline',
+        soilIsLive ? 'good' : soil.connected ? 'warning' : 'error');
+      setText('soilUpdatedAt', Number.isFinite(soilAgeMs)
+        ? `${new Date(soil.last_seen).toLocaleTimeString()} · ${Math.floor(soilAgeMs / 1000)}s ago`
+        : 'No reading yet');
+      if (soil.soil_value != null) {
+        const soilValue = Math.max(0, Math.min(1023, Number(soil.soil_value)));
+        const marker = document.getElementById('soilMarker');
+        marker.style.left = `${soilValue / 1023 * 100}%`;
+        document.getElementById('soilScale').setAttribute('aria-valuenow', String(soilValue));
+      }
       setText('binFill', dustbin.fill == null ? '--' : `${dustbin.fill}%`);
       setText('binDistance', dustbin.distance == null ? '--' : `${dustbin.distance} cm`);
       const sensorStatus = dustbin.sensor_status || 'Waiting';
@@ -570,7 +624,7 @@
     });
 
     refreshState();
-    setInterval(refreshState, 3000);
+    setInterval(refreshState, 2000);
   </script>
 </body>
 </html>

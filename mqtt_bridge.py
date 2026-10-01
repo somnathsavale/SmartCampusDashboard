@@ -7,8 +7,12 @@ import time
 import urllib.error
 import urllib.request
 
-import paho.mqtt.client as mqtt
 import serial
+
+try:
+    import paho.mqtt.client as mqtt
+except ImportError:
+    mqtt = None
 
 
 SERIAL_BAUD = int(os.environ.get("SMART_BAUD", "9600"))
@@ -26,6 +30,9 @@ BOARD_PORTS = {
     "dustbin": os.environ.get("ARDUINO_2_PORT", "COM6"),
     "classroom": os.environ.get("ARDUINO_2_PORT", "COM6"),
 }
+if BOARD_PORTS["dustbin"].strip().lower() in {"none", "disabled", "off"}:
+    BOARD_PORTS["dustbin"] = ""
+    BOARD_PORTS["classroom"] = ""
 connections = {}
 connections_lock = threading.Lock()
 
@@ -150,6 +157,8 @@ def main():
         raise SystemExit("Set ARDUINO_BRIDGE_TOKEN for HTTP mode.")
     if not DASHBOARD_URL and not MQTT_HOST:
         raise SystemExit("Set DASHBOARD_URL for HTTP mode or MQTT_HOST for MQTT mode.")
+    if not DASHBOARD_URL and mqtt is None:
+        raise SystemExit("Install paho-mqtt to use MQTT mode.")
 
     grouped_ports = {}
     for board, port in BOARD_PORTS.items():
