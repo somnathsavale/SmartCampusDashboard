@@ -443,6 +443,13 @@
 
   <script>
     const soilHistory = [];
+    const completedTokenKey = 'smartCampusCompletedToken';
+    const highestTokenKey = 'smartCampusHighestToken';
+    let completedToken = Number(localStorage.getItem(completedTokenKey)) || 0;
+    let highestSeenToken = Math.max(completedToken, Number(localStorage.getItem(highestTokenKey)) || 0);
+    let lastServingOrder = null;
+    let noServingSince = null;
+    let lastDisplayedToken = null;
     let lastSoilSeen = null;
 
     function setText(id, value) {
@@ -500,9 +507,49 @@
       }).join('');
     }
 
+    function stabilizeCanteen(canteen) {
+      const orders = Array.isArray(canteen.orders) ? canteen.orders : [];
+      const candidate = canteen.current_order || orders.find(order => order.status === 'Serving');
+      const candidateToken = Number(candidate && candidate.token);
+
+      if (candidate && Number.isSafeInteger(candidateToken)
+          && candidateToken > completedToken && candidateToken >= highestSeenToken) {
+        lastServingOrder = candidate;
+        highestSeenToken = candidateToken;
+        localStorage.setItem(highestTokenKey, String(highestSeenToken));
+        noServingSince = null;
+      } else if (lastServingOrder) {
+        if (noServingSince === null) noServingSince = Date.now();
+        if (Date.now() - noServingSince >= 15000) {
+          completedToken = Math.max(completedToken, Number(lastServingOrder.token));
+          localStorage.setItem(completedTokenKey, String(completedToken));
+          lastServingOrder = null;
+          noServingSince = null;
+        }
+      }
+
+      const visibleOrders = orders.filter(order =>
+        Number(order.token) > completedToken && Number(order.token) >= highestSeenToken);
+      if (lastServingOrder && !visibleOrders.some(order => Number(order.token) === Number(lastServingOrder.token))) {
+        visibleOrders.unshift(lastServingOrder);
+      }
+
+      const displayedToken = canteen.displayed_token == null
+        ? lastDisplayedToken : Number(canteen.displayed_token);
+      if (displayedToken != null) lastDisplayedToken = displayedToken;
+
+      return {
+        ...canteen,
+        current_order: lastServingOrder,
+        displayed_token: displayedToken,
+        orders: visibleOrders,
+        queue: Math.max(Number(canteen.queue) || 0, visibleOrders.length)
+      };
+    }
+
     function renderState(data) {
       const soil = data.irrigation || {};
-      const canteen = data.canteen || {};
+      const canteen = stabilizeCanteen(data.canteen || {});
       const dustbin = data.dustbin || {};
       const room = data.classroom || {};
       const current = canteen.current_order;
@@ -618,6 +665,15 @@
       const result = await response.json();
       if (result.ok) {
         document.getElementById('orderMessage').textContent = `Token ${String(result.order.token).padStart(4, '0')} issued.`;
+        if (result.order.status === 'Serving') {
+          const token = Number(result.order.token);
+          if (token > completedToken && token >= highestSeenToken) {
+            lastServingOrder = result.order;
+            highestSeenToken = token;
+            localStorage.setItem(highestTokenKey, String(highestSeenToken));
+            noServingSince = null;
+          }
+        }
         document.getElementById('orderForm').reset();
       } else {
         document.getElementById('orderMessage').textContent = 'Order could not be created.';
