@@ -296,30 +296,34 @@ void loop()
   // 5. PUSH BUTTON
   // ===================================================
 
-  static bool previousButton = HIGH;
+  static bool lastButtonReading = HIGH;
+  static bool stableButtonState = HIGH;
+  static bool buttonArmed = false;
+  static unsigned long lastDebounceTime = 0;
+  static unsigned long lastNextTime = 0;
 
-  bool currentButton = digitalRead(BUTTON);
-
-
-  if (previousButton == HIGH && currentButton == LOW)
+  bool buttonReading = digitalRead(BUTTON);
+  if (buttonReading != lastButtonReading)
   {
-    Serial.println("NEXT");
-
-    // Beep
-    beep();
-
-    // Debounce
-    delay(300);
-
-    // Wait until button released
-    while (digitalRead(BUTTON) == LOW)
-    {
-      delay(10);
-    }
+    lastDebounceTime = millis();
+    lastButtonReading = buttonReading;
   }
 
-
-  previousButton = currentButton;
+  if (millis() - lastDebounceTime >= 50 && buttonReading != stableButtonState)
+  {
+    stableButtonState = buttonReading;
+    if (stableButtonState == HIGH)
+    {
+      buttonArmed = true;
+    }
+    else if (buttonArmed && millis() - lastNextTime >= 1500)
+    {
+      buttonArmed = false;
+      lastNextTime = millis();
+      Serial.println("NEXT");
+      beep();
+    }
+  }
 
 
   // Small delay
