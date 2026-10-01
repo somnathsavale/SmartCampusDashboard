@@ -191,6 +191,16 @@ class HttpBridgeTests(unittest.TestCase):
 
 
 class DisplayReconciliationTests(unittest.TestCase):
+    def test_serial_connection_disables_dtr_before_opening(self):
+        connection = Mock()
+        with patch.object(mqtt_bridge.serial, "Serial", return_value=connection):
+            result = mqtt_bridge.open_serial_connection("COM5")
+
+        self.assertIs(result, connection)
+        self.assertFalse(connection.dtr)
+        self.assertEqual(connection.port, "COM5")
+        connection.open.assert_called_once_with()
+
     def test_bridge_discovers_arduino_on_a_new_com_port(self):
         ports = [SimpleNamespace(
             device="COM9", description="Arduino Uno", manufacturer="Arduino", hwid="USB VID:PID=2341:0043"

@@ -75,6 +75,14 @@ def discover_arduino_port():
     return None
 
 
+def open_serial_connection(port):
+    connection = serial.Serial(port=None, baudrate=SERIAL_BAUD, timeout=1)
+    connection.dtr = False
+    connection.port = port
+    connection.open()
+    return connection
+
+
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code == 0:
         client.subscribe(f"{MQTT_TOPIC}/commands/+")
@@ -113,7 +121,7 @@ def serial_worker(port, boards, client):
                 time.sleep(4)
                 continue
         try:
-            with serial.Serial(resolved_port, SERIAL_BAUD, timeout=1) as connection:
+            with open_serial_connection(resolved_port) as connection:
                 with connections_lock:
                     connections[resolved_port] = connection
                     for board in boards:
