@@ -68,6 +68,28 @@ class CanteenOrderPersistenceTests(unittest.TestCase):
         self.assertIn(b'href="https://orders.example.test"', response.data)
         self.assertIn(b"Open customer order page", response.data)
 
+    def test_canteen_arduino_command_waits_for_authenticated_bridge_ack(self):
+        headers = {"Authorization": "Bearer bridge-secret"}
+        with patch.object(dashboard, "ARDUINO_BRIDGE_TOKEN", "bridge-secret"), patch.object(
+            dashboard, "serial_connections", {}
+        ), patch.object(dashboard, "mqtt_publish_command", return_value=False), patch.object(
+            dashboard, "start_serial_detection_once"
+        ), patch.object(dashboard, "start_mqtt_subscriber_once"):
+            order = self.client.post(
+                "/api/canteen/orders", json={"name": "Alex", "food": "Soup"}
+            )
+            commands = self.client.get("/api/bridge/commands?board=canteen", headers=headers)
+            command_id = commands.json["commands"][0]["id"]
+            acknowledged = self.client.post(
+                f"/api/bridge/commands/{command_id}/ack", headers=headers
+            )
+            remaining = self.client.get("/api/bridge/commands?board=canteen", headers=headers)
+
+        self.assertEqual(order.status_code, 200)
+        self.assertEqual(commands.json["commands"][0]["command"], "DISPLAY:1")
+        self.assertEqual(acknowledged.status_code, 200)
+        self.assertEqual(remaining.json["commands"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

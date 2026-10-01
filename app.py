@@ -1,4 +1,5 @@
 import json
+import hmac
 import os
 import re
 import sqlite3
@@ -33,9 +34,17 @@ SERIAL_BAUD = int(os.environ.get("SMART_BAUD", "9600"))
 MQTT_HOST = os.environ.get("MQTT_HOST", "")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.environ.get("MQTT_TOPIC", "smart-campus/telemetry")
+MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
+MQTT_TLS = os.environ.get("MQTT_TLS", "0") == "1"
+SERIAL_ENABLED = os.environ.get("SMART_SERIAL_ENABLED", "1") != "0"
+ARDUINO_BRIDGE_TOKEN = os.environ.get("ARDUINO_BRIDGE_TOKEN", "")
 lock = threading.Lock()
 serial_detection_lock = threading.Lock()
 serial_detection_started = False
+mqtt_subscriber_lock = threading.Lock()
+mqtt_subscriber_started = False
+mqtt_subscriber_client = None
 serial_ports = {}
 serial_threads = {}
 serial_connections = {}
@@ -70,6 +79,7 @@ def db_init():
 		db.execute("CREATE TABLE IF NOT EXISTS readings (id INTEGER PRIMARY KEY, created_at TEXT, module TEXT, payload TEXT)")
 		db.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, created_at TEXT, level TEXT, module TEXT, message TEXT)")
 		db.execute("CREATE TABLE IF NOT EXISTS canteen_orders (token INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, food TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)")
+		db.execute("CREATE TABLE IF NOT EXISTS bridge_commands (id INTEGER PRIMARY KEY AUTOINCREMENT, board TEXT NOT NULL, command TEXT NOT NULL, created_at TEXT NOT NULL)")
 
 def load_active_orders(db=None):
 	if db is None:
@@ -111,7 +121,7 @@ def module_connection_summary(port_map=None, module_state=None):
 		mapped = any(port_map.get(module) for module in modules)
 		if module_state is None:
 			return mapped
-		return mapped and any(module_state.get(module, {}).get("connected", False) for module in modules)
+		return any(module_state.get(module, {}).get("connected", False) for module in modules)
 
 	return {
 		"irrigation": group_connected(("irrigation", "canteen")),
@@ -145,11 +155,97 @@ def mqtt_publish(module, payload):
 		return
 	try:
 		client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+		configure_mqtt_client(client)
 		client.connect(MQTT_HOST, MQTT_PORT, 5)
 		client.publish(f"{MQTT_TOPIC}/{module}", json.dumps(payload))
 		client.disconnect()
 	except Exception as exc:
 		add_event("warning", "system", f"MQTT unavailable: {exc}")
+
+def configure_mqtt_client(client):
+	if MQTT_USERNAME:
+		client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+	if MQTT_TLS:
+		client.tls_set()
+
+def mqtt_publish_command(board, command):
+	if mqtt is None or not MQTT_HOST:
+		return False
+	try:
+		client = mqtt_subscriber_client
+		if client is not None and client.is_connected():
+			result = client.publish(f"{MQTT_TOPIC}/commands/{board}", command)
+			return result.rc == mqtt.MQTT_ERR_SUCCESS
+		client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+		configure_mqtt_client(client)
+		client.connect(MQTT_HOST, MQTT_PORT, 5)
+		result = client.publish(f"{MQTT_TOPIC}/commands/{board}", command)
+		client.disconnect()
+		return result.rc == mqtt.MQTT_ERR_SUCCESS
+	except Exception as exc:
+		add_event("warning", "system", f"MQTT command unavailable: {exc}")
+		return False
+
+def handle_serial_line(board, line):
+	if board not in BOARD_GROUPS or not isinstance(line, str) or not line.strip():
+		return False
+	line = line.strip()
+	with lock:
+		for module in BOARD_GROUPS[board]:
+			state[module].update(connected=True, last_seen=now_iso())
+	parse_line(line, board)
+	return True
+
+def handle_mqtt_serial_message(topic, payload):
+	prefix = f"{MQTT_TOPIC}/serial/"
+	if not topic.startswith(prefix):
+		return False
+	board = topic[len(prefix):]
+	if board not in BOARD_GROUPS:
+		return False
+	try:
+		message = json.loads(payload.decode("utf-8"))
+		line = message.get("line", "") if isinstance(message, dict) else str(message)
+	except (UnicodeDecodeError, json.JSONDecodeError):
+		line = payload.decode("utf-8", errors="replace")
+	line = str(line).strip()
+	return handle_serial_line(board, line)
+
+def bridge_authorized():
+	provided = request.headers.get("Authorization", "")
+	return bool(ARDUINO_BRIDGE_TOKEN) and hmac.compare_digest(
+		provided, f"Bearer {ARDUINO_BRIDGE_TOKEN}"
+	)
+
+def enqueue_bridge_command(board, command):
+	with database_connection() as db:
+		db.execute(
+			"INSERT INTO bridge_commands(board, command, created_at) VALUES (?, ?, ?)",
+			(board, command, now_iso()),
+		)
+
+def start_mqtt_subscriber_once():
+	global mqtt_subscriber_started, mqtt_subscriber_client
+	if mqtt is None or not MQTT_HOST:
+		return
+	with mqtt_subscriber_lock:
+		if mqtt_subscriber_started:
+			return
+		mqtt_subscriber_started = True
+	try:
+		client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+		configure_mqtt_client(client)
+		client.on_connect = lambda connected_client, userdata, flags, reason, properties: (
+			connected_client.subscribe(f"{MQTT_TOPIC}/serial/+") if reason == 0 else None
+		)
+		client.on_message = lambda connected_client, userdata, message: handle_mqtt_serial_message(
+			message.topic, message.payload
+		)
+		client.connect_async(MQTT_HOST, MQTT_PORT, 30)
+		client.loop_start()
+		mqtt_subscriber_client = client
+	except Exception as exc:
+		add_event("warning", "system", f"Could not start MQTT listener: {exc}")
 
 def update_module(module, values):
 	with lock:
@@ -177,16 +273,22 @@ def serve_next_order():
 		if next_order:
 			state["canteen"]["orders_served"] += 1
 		port = get_board_port("canteen")
-	if next_order and port:
+	if next_order:
 		send_serial_command(port, f"DISPLAY:{next_order['token']}")
-	elif port:
+	elif port or ARDUINO_BRIDGE_TOKEN or (MQTT_HOST and mqtt):
 		send_serial_command(port, "EMPTY")
 	return next_order
 
 def send_serial_command(port, command):
 	connection = serial_connections.get(port)
 	if connection is None:
-		add_event("warning", "canteen", f"Could not send command: {port} is not connected")
+		if mqtt_publish_command("canteen", command):
+			return
+		if ARDUINO_BRIDGE_TOKEN:
+			enqueue_bridge_command("canteen", command)
+			add_event("info", "canteen", "Queued Arduino command for the local bridge")
+		else:
+			add_event("warning", "canteen", f"Could not send command: {port} is not connected and MQTT is unavailable")
 		return
 	try:
 		connection.write(f"{command}\n".encode())
@@ -325,6 +427,8 @@ def auto_detect_boards():
 
 def start_serial_detection_once():
 	global serial_detection_started
+	if not SERIAL_ENABLED:
+		return
 	with serial_detection_lock:
 		if serial_detection_started:
 			return
@@ -334,6 +438,7 @@ def start_serial_detection_once():
 @app.before_request
 def start_serial_detection_for_flask():
 	start_serial_detection_once()
+	start_mqtt_subscriber_once()
 
 @app.route("/")
 def index():
@@ -351,7 +456,7 @@ def api_state():
 		snapshot = json.loads(json.dumps(state))
 		board_status = module_connection_summary(serial_ports, state)
 		snapshot["system"] = {
-			"mqtt": bool(MQTT_HOST and mqtt),
+			"mqtt": bool(mqtt_subscriber_client and mqtt_subscriber_client.is_connected()),
 			"serial_available": serial is not None,
 			"auto_detect": True,
 			"arduino_1": serial_ports.get("irrigation") or serial_ports.get("canteen"),
@@ -397,10 +502,47 @@ def api_order():
 		state["canteen"]["current_order"] = next((item for item in orders if item["status"] == "Serving"), None)
 		state["canteen"]["orders"] = list(orders)
 		port = get_board_port("canteen")
-	if order["status"] == "Serving" and port:
+	if order["status"] == "Serving":
 		send_serial_command(port, f"DISPLAY:{order['token']}")
 	add_event("info", "canteen", f"Order {order['token']} added for {name}")
 	return jsonify({"ok": True, "order": order, "queue": len(orders)})
+
+@app.post("/api/bridge/telemetry")
+def api_bridge_telemetry():
+	if not bridge_authorized():
+		return jsonify({"error": "Unauthorized"}), 401
+	data = request.get_json(silent=True) or {}
+	board = data.get("board")
+	line = data.get("line")
+	if board not in BOARD_GROUPS or not isinstance(line, str) or len(line) > 512:
+		return jsonify({"error": "Invalid telemetry"}), 400
+	if not handle_serial_line(board, line):
+		return jsonify({"error": "Invalid telemetry"}), 400
+	return jsonify({"ok": True})
+
+@app.get("/api/bridge/commands")
+def api_bridge_commands():
+	if not bridge_authorized():
+		return jsonify({"error": "Unauthorized"}), 401
+	board = request.args.get("board", "")
+	if board not in BOARD_GROUPS:
+		return jsonify({"error": "Unknown board"}), 400
+	with database_connection() as db:
+		rows = db.execute(
+			"SELECT id, command FROM bridge_commands WHERE board = ? ORDER BY id",
+			(board,),
+		).fetchall()
+	return jsonify({"commands": [{"id": row[0], "command": row[1]} for row in rows]})
+
+@app.post("/api/bridge/commands/<int:command_id>/ack")
+def api_bridge_command_ack(command_id):
+	if not bridge_authorized():
+		return jsonify({"error": "Unauthorized"}), 401
+	with database_connection() as db:
+		cursor = db.execute("DELETE FROM bridge_commands WHERE id = ?", (command_id,))
+	if cursor.rowcount == 0:
+		return jsonify({"error": "Command not found"}), 404
+	return jsonify({"ok": True})
 
 @app.post("/api/canteen/next")
 def api_next():

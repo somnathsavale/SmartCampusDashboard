@@ -22,3 +22,22 @@ Set `CANTEEN_DASHBOARD_URL` on the customer service to the dashboard's reachable
 On Vercel, the dashboard stores SQLite in the function's writable temporary directory because the deployment filesystem is read-only. Vercel temporary storage can be cleared on cold starts and is not durable; use a managed database or a host with a persistent disk if orders must survive restarts or scale across function instances.
 
 Set `CANTEEN_ORDER_URL` on the dashboard service to the customer service's public URL so the dashboard's Canteen tab opens the deployed order page. It defaults to `http://127.0.0.1:8000` for local development.
+
+## Connect Arduino boards to the deployed dashboard
+
+A cloud service cannot read USB serial ports on your computer. Run `mqtt_bridge.py` on the computer connected to the Arduino; HTTP mode forwards readings to the dashboard's public API and polls for canteen display commands. No MQTT broker is needed for HTTP mode.
+
+Configure the dashboard service with:
+
+- `ARDUINO_BRIDGE_TOKEN`: a long random secret shared with the local bridge.
+- `SMART_SERIAL_ENABLED=0`: disable USB scanning on the cloud host.
+
+On the Arduino-connected computer, install the project requirements and set:
+
+- `DASHBOARD_URL`: the deployed dashboard's base URL, without an API path.
+- `ARDUINO_BRIDGE_TOKEN`: the same secret as the dashboard service.
+- `ARDUINO_1_PORT` and `ARDUINO_2_PORT`: serial ports; defaults are `COM5` and `COM6`. Set an unused board's port to an empty value.
+
+Then run `python mqtt_bridge.py` and leave it running. The Arduino sketch and bridge must use the same `SMART_BAUD`, which defaults to `9600`. Use HTTPS for the deployed dashboard URL, and do not commit the shared token to the repository.
+
+MQTT mode is also available when `DASHBOARD_URL` is unset; set the same broker settings on both the dashboard and bridge in that case.

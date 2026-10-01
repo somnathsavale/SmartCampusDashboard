@@ -96,5 +96,63 @@ class SerialStartupTests(unittest.TestCase):
         self.assertTrue(result["classroom"])
 
 
+class MqttBridgeTests(unittest.TestCase):
+    def test_mqtt_serial_message_routes_line_to_existing_parser(self):
+        with patch.object(dashboard, "parse_line") as parse_line:
+            handled = dashboard.handle_mqtt_serial_message(
+                f"{dashboard.MQTT_TOPIC}/serial/irrigation",
+                b'{"line":"Soil Value = 812"}',
+            )
+
+        self.assertTrue(handled)
+        parse_line.assert_called_once_with("Soil Value = 812", "irrigation")
+
+    def test_mqtt_connection_state_counts_without_a_local_com_port(self):
+        module_state = {
+            "irrigation": {"connected": True},
+            "canteen": {"connected": True},
+            "dustbin": {"connected": False},
+            "classroom": {"connected": False},
+        }
+
+        result = module_connection_summary({}, module_state)
+
+        self.assertTrue(result["irrigation"])
+        self.assertTrue(result["canteen"])
+        self.assertFalse(result["dustbin"])
+        self.assertFalse(result["classroom"])
+
+    def test_canteen_commands_fall_back_to_mqtt(self):
+        with patch.object(dashboard, "serial_connections", {}), patch.object(
+            dashboard, "mqtt_publish_command", return_value=True
+        ) as publish_command:
+            dashboard.send_serial_command("COM5", "DISPLAY:12")
+
+        publish_command.assert_called_once_with("canteen", "DISPLAY:12")
+
+
+class HttpBridgeTests(unittest.TestCase):
+    def test_telemetry_endpoint_requires_token_and_routes_serial_line(self):
+        headers = {"Authorization": "Bearer bridge-secret"}
+        with patch.object(dashboard, "ARDUINO_BRIDGE_TOKEN", "bridge-secret"), patch.object(
+            dashboard, "handle_serial_line"
+        ) as handle_line, patch.object(dashboard, "start_serial_detection_once"), patch.object(
+            dashboard, "start_mqtt_subscriber_once"
+        ):
+            client = dashboard.app.test_client()
+            denied = client.post(
+                "/api/bridge/telemetry", json={"board": "irrigation", "line": "SOIL DRY"}
+            )
+            accepted = client.post(
+                "/api/bridge/telemetry",
+                json={"board": "irrigation", "line": "SOIL DRY"},
+                headers=headers,
+            )
+
+        self.assertEqual(denied.status_code, 401)
+        self.assertEqual(accepted.status_code, 200)
+        handle_line.assert_called_once_with("irrigation", "SOIL DRY")
+
+
 if __name__ == "__main__":
     unittest.main()
