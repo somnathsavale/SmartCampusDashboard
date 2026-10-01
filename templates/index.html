@@ -389,7 +389,7 @@
       <div class="card panel">
         <h2>Canteen</h2>
         <div class="rows">
-          <div class="row"><span>Token on Arduino</span><strong id="displayedToken">Waiting</strong></div>
+          <div class="row"><span>Serving token / board</span><strong id="displayedToken">Waiting</strong></div>
         </div>
         <a class="order-page-link" href="{{ canteen_order_url }}" target="_blank" rel="noopener noreferrer">
           <span>Open customer order page</span>
@@ -554,8 +554,16 @@
       const room = data.classroom || {};
       const current = canteen.current_order;
 
-      setText('displayedToken', canteen.displayed_token == null
-        ? 'No token reported' : `#${String(canteen.displayed_token).padStart(4, '0')}`);
+      const servingToken = canteen.current_order && Number(canteen.current_order.token);
+      const reportedToken = canteen.displayed_token == null ? null : Number(canteen.displayed_token);
+      if (servingToken) {
+        const boardStatus = reportedToken === servingToken
+          ? 'on board' : canteen.connected ? 'syncing' : 'board offline';
+        setText('displayedToken', `#${String(servingToken).padStart(4, '0')} · ${boardStatus}`);
+      } else {
+        setText('displayedToken', reportedToken == null
+          ? 'No active order' : `#${String(reportedToken).padStart(4, '0')} · on board`);
+      }
       setText('soilValue', soil.soil_value ?? '--');
       setText('soilStatus', soil.soil_status || 'Waiting');
       setText('pumpValue', soil.pump ? 'ON' : 'OFF');

@@ -38,7 +38,7 @@ On the Arduino-connected computer, install the project requirements and set:
 
 - `DASHBOARD_URL`: the deployed dashboard's base URL, without an API path.
 - `ARDUINO_BRIDGE_TOKEN`: the same secret as the dashboard service.
-- `ARDUINO_1_PORT` and `ARDUINO_2_PORT`: serial ports; defaults are `COM5` and `COM6`. Set an unused board's port to an empty value.
+- `ARDUINO_1_PORT` and `ARDUINO_2_PORT`: serial ports; Arduino 1 defaults to automatic USB serial detection, while Arduino 2 defaults to `COM6`. Set an unused board's port to `disabled`.
 
 Then run `python mqtt_bridge.py` and leave it running. The Arduino sketch and bridge must use the same `SMART_BAUD`, which defaults to `9600`. Use HTTPS for the deployed dashboard URL, and do not commit the shared token to the repository.
 

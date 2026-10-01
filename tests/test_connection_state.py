@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import app as dashboard
@@ -190,6 +191,15 @@ class HttpBridgeTests(unittest.TestCase):
 
 
 class DisplayReconciliationTests(unittest.TestCase):
+    def test_bridge_discovers_arduino_on_a_new_com_port(self):
+        ports = [SimpleNamespace(
+            device="COM9", description="Arduino Uno", manufacturer="Arduino", hwid="USB VID:PID=2341:0043"
+        )]
+        with patch.object(mqtt_bridge.list_ports, "comports", return_value=ports):
+            discovered = mqtt_bridge.discover_arduino_port()
+
+        self.assertEqual(discovered, "COM9")
+
     def test_transient_empty_response_keeps_token_displayed(self):
         connection = Mock()
 
@@ -221,6 +231,16 @@ class DisplayReconciliationTests(unittest.TestCase):
 
         self.assertEqual(displayed_token, 42)
         connection.write.assert_not_called()
+
+    def test_reconnected_board_gets_cached_token_even_if_api_is_empty(self):
+        connection = Mock()
+
+        displayed_token = mqtt_bridge.reconcile_display(
+            None, connection, 42, force=True
+        )
+
+        self.assertEqual(displayed_token, 42)
+        connection.write.assert_called_once_with(b"DISPLAY:42\n")
 
 
 if __name__ == "__main__":
