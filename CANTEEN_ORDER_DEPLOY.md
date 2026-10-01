@@ -21,6 +21,8 @@ Set `CANTEEN_DASHBOARD_URL` on the customer service to the dashboard's reachable
 
 On Vercel, the dashboard stores SQLite in the function's writable temporary directory because the deployment filesystem is read-only. Vercel temporary storage can be cleared on cold starts and is not durable; use a managed database or a host with a persistent disk if orders must survive restarts or scale across function instances.
 
+For reliable orders and Arduino token display on Vercel, provision a managed PostgreSQL database and set its connection string as the dashboard's `DATABASE_URL` environment variable, then redeploy. The app creates its tables automatically and uses a transaction-level lock when advancing orders. Without `DATABASE_URL`, Vercel falls back to temporary SQLite, which is not shared reliably between serverless instances.
+
 Set `CANTEEN_ORDER_URL` on the dashboard service to the customer service's public URL so the dashboard's Canteen tab opens the deployed order page. It defaults to `http://127.0.0.1:8000` for local development.
 
 ## Connect Arduino boards to the deployed dashboard

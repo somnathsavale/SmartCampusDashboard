@@ -13,6 +13,11 @@ from datetime import datetime, timezone
 from flask import Flask, jsonify, render_template, request
 
 try:
+	import psycopg
+except ImportError:
+	psycopg = None
+
+try:
 	import serial
 	from serial.tools import list_ports
 except ImportError:
@@ -25,6 +30,7 @@ except ImportError:
 	mqtt = None
 
 app = Flask(__name__)
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 if os.environ.get("VERCEL") == "1":
 	DB_PATH = os.path.join(tempfile.gettempdir(), "smart_dashboard.db")
 else:
@@ -64,22 +70,55 @@ def now_iso():
 
 @contextmanager
 def database_connection():
-	connection = sqlite3.connect(DB_PATH)
+	if DATABASE_URL:
+		if psycopg is None:
+			raise RuntimeError("Install psycopg to use DATABASE_URL")
+		connection = psycopg.connect(DATABASE_URL)
+		postgres = True
+	else:
+		connection = sqlite3.connect(DB_PATH)
+		postgres = False
+	database = DatabaseConnection(connection, postgres)
 	try:
-		yield connection
-		connection.commit()
+		yield database
+		database.commit()
 	except Exception:
-		connection.rollback()
+		database.rollback()
 		raise
 	finally:
-		connection.close()
+		database.close()
+
+class DatabaseConnection:
+	def __init__(self, connection, postgres):
+		self.connection = connection
+		self.postgres = postgres
+
+	def execute(self, query, parameters=()):
+		if self.postgres:
+			query = query.replace("?", "%s")
+		return self.connection.execute(query, parameters)
+
+	def __getattr__(self, name):
+		return getattr(self.connection, name)
+
+def lock_canteen_queue(db):
+	if DATABASE_URL:
+		db.execute("SELECT pg_advisory_xact_lock(?)", (72849103,))
+	else:
+		db.execute("BEGIN IMMEDIATE")
 
 def db_init():
 	with database_connection() as db:
-		db.execute("CREATE TABLE IF NOT EXISTS readings (id INTEGER PRIMARY KEY, created_at TEXT, module TEXT, payload TEXT)")
-		db.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, created_at TEXT, level TEXT, module TEXT, message TEXT)")
-		db.execute("CREATE TABLE IF NOT EXISTS canteen_orders (token INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, food TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)")
-		db.execute("CREATE TABLE IF NOT EXISTS bridge_commands (id INTEGER PRIMARY KEY AUTOINCREMENT, board TEXT NOT NULL, command TEXT NOT NULL, created_at TEXT NOT NULL)")
+		if DATABASE_URL:
+			db.execute("CREATE TABLE IF NOT EXISTS readings (id BIGSERIAL PRIMARY KEY, created_at TEXT, module TEXT, payload TEXT)")
+			db.execute("CREATE TABLE IF NOT EXISTS events (id BIGSERIAL PRIMARY KEY, created_at TEXT, level TEXT, module TEXT, message TEXT)")
+			db.execute("CREATE TABLE IF NOT EXISTS canteen_orders (token BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, food TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)")
+			db.execute("CREATE TABLE IF NOT EXISTS bridge_commands (id BIGSERIAL PRIMARY KEY, board TEXT NOT NULL, command TEXT NOT NULL, created_at TEXT NOT NULL)")
+		else:
+			db.execute("CREATE TABLE IF NOT EXISTS readings (id INTEGER PRIMARY KEY, created_at TEXT, module TEXT, payload TEXT)")
+			db.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, created_at TEXT, level TEXT, module TEXT, message TEXT)")
+			db.execute("CREATE TABLE IF NOT EXISTS canteen_orders (token INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, food TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)")
+			db.execute("CREATE TABLE IF NOT EXISTS bridge_commands (id INTEGER PRIMARY KEY AUTOINCREMENT, board TEXT NOT NULL, command TEXT NOT NULL, created_at TEXT NOT NULL)")
 
 def load_active_orders(db=None):
 	if db is None:
@@ -260,7 +299,7 @@ def serve_next_order():
 	global orders
 	with lock:
 		with database_connection() as db:
-			db.execute("BEGIN IMMEDIATE")
+			lock_canteen_queue(db)
 			current = db.execute("SELECT token FROM canteen_orders WHERE status = 'Serving' ORDER BY token LIMIT 1").fetchone()
 			if current:
 				db.execute("UPDATE canteen_orders SET status = 'Completed' WHERE token = ?", (current[0],))
@@ -502,13 +541,13 @@ def api_order():
 	food = str(data.get("food", "Meal")).strip() or "Meal"
 	with lock:
 		with database_connection() as db:
-			db.execute("BEGIN IMMEDIATE")
+			lock_canteen_queue(db)
 			status = "Waiting" if db.execute("SELECT 1 FROM canteen_orders WHERE status IN ('Serving', 'Waiting') LIMIT 1").fetchone() else "Serving"
 			cursor = db.execute(
-				"INSERT INTO canteen_orders(name, food, status, created_at) VALUES (?, ?, ?, ?)",
+				"INSERT INTO canteen_orders(name, food, status, created_at) VALUES (?, ?, ?, ?) RETURNING token",
 				(name, food, status, now_iso()),
 			)
-			token = cursor.lastrowid
+			token = cursor.fetchone()[0]
 			order = {"token": token, "name": name, "food": food, "status": status}
 			orders = load_active_orders(db)
 		state["canteen"]["queue"] = len(orders)

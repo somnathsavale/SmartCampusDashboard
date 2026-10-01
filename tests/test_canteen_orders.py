@@ -17,6 +17,8 @@ class CanteenOrderPersistenceTests(unittest.TestCase):
             dashboard, "DB_PATH", os.path.join(self.temp_directory.name, "test.db")
         )
         self.db_path_patch.start()
+        self.database_url_patch = patch.object(dashboard, "DATABASE_URL", "")
+        self.database_url_patch.start()
         dashboard.orders = []
         dashboard.db_init()
         self.client = dashboard.app.test_client()
@@ -24,6 +26,7 @@ class CanteenOrderPersistenceTests(unittest.TestCase):
     def tearDown(self):
         dashboard.orders = self.previous_orders
         dashboard.state["canteen"] = self.previous_canteen_state
+        self.database_url_patch.stop()
         self.db_path_patch.stop()
         self.temp_directory.cleanup()
 
@@ -85,6 +88,22 @@ class CanteenOrderPersistenceTests(unittest.TestCase):
         self.assertEqual(display.status_code, 200)
         self.assertEqual(display.json, {"token": 1})
         self.assertEqual(commands.json["commands"], [])
+
+
+class DatabaseAdapterTests(unittest.TestCase):
+    def test_postgres_connection_converts_sqlite_placeholders(self):
+        class RecordingConnection:
+            def execute(self, query, parameters):
+                return query, parameters
+
+        database = dashboard.DatabaseConnection(RecordingConnection(), postgres=True)
+
+        query, parameters = database.execute(
+            "SELECT token FROM canteen_orders WHERE token = ?", (7,)
+        )
+
+        self.assertEqual(query, "SELECT token FROM canteen_orders WHERE token = %s")
+        self.assertEqual(parameters, (7,))
 
 
 if __name__ == "__main__":
