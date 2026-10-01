@@ -109,6 +109,7 @@
     }
     .soil-scale-labels { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .78rem; }
     .reading-age { color: var(--muted); font-size: .85rem; }
+    .serial-message { max-width: 68%; overflow-wrap: anywhere; text-align: right; }
     .irrigation-live { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
 
     h1 {
@@ -373,6 +374,7 @@
           <div class="row"><span>Sensor Reading (ADC)</span><strong id="soilReading">--</strong></div>
           <div class="row"><span>Pump State</span><strong id="pumpState">OFF</strong></div>
           <div class="row"><span>Last Sensor Update</span><strong class="reading-age" id="soilUpdatedAt">No reading yet</strong></div>
+          <div class="row"><span>Latest Arduino Message</span><strong class="serial-message" id="soilSerialMessage">Waiting for serial data</strong></div>
         </div>
         <div class="soil-scale" role="meter" aria-label="Soil sensor ADC reading from wet to dry" aria-valuemin="0" aria-valuemax="1023" aria-valuenow="0" id="soilScale">
           <span></span><span></span><span></span><i class="soil-marker" id="soilMarker"></i>
@@ -530,6 +532,7 @@
       setText('soilUpdatedAt', Number.isFinite(soilAgeMs)
         ? `${new Date(soil.last_seen).toLocaleTimeString()} · ${Math.floor(soilAgeMs / 1000)}s ago`
         : 'No reading yet');
+      setText('soilSerialMessage', soil.last_message || 'Waiting for serial data');
       if (soil.soil_value != null) {
         const soilValue = Math.max(0, Math.min(1023, Number(soil.soil_value)));
         const marker = document.getElementById('soilMarker');

@@ -53,7 +53,7 @@ FIXED_PORT_MAP = {"irrigation": "COM5", "canteen": "COM5", "dustbin": "COM6", "c
 logs = deque(maxlen=80)
 orders = []
 state = {
-	"irrigation": {"soil_value": None, "soil_status": "Waiting", "pump": False, "connected": False, "last_seen": None},
+	"irrigation": {"soil_value": None, "soil_status": "Waiting", "pump": False, "connected": False, "last_seen": None, "last_message": "Waiting for serial data"},
 	"canteen": {"queue": 0, "current_order": None, "orders_served": 0, "orders": [], "connected": False, "last_seen": None},
 	"dustbin": {"fill": None, "distance": None, "sensor_status": "Waiting", "warning": False, "connected": False, "last_seen": None},
 	"classroom": {"people": 0, "light": False, "fan": False, "connected": False, "last_seen": None},
@@ -193,6 +193,8 @@ def handle_serial_line(board, line):
 	with lock:
 		for module in BOARD_GROUPS[board]:
 			state[module].update(connected=True, last_seen=now_iso())
+		if board == "irrigation":
+			state["irrigation"]["last_message"] = line
 	parse_line(line, board)
 	return True
 

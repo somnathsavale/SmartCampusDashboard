@@ -142,6 +142,18 @@ class MqttBridgeTests(unittest.TestCase):
 
 
 class HttpBridgeTests(unittest.TestCase):
+    def test_irrigation_telemetry_keeps_latest_raw_serial_line(self):
+        previous_state = dashboard.state["irrigation"].copy()
+        try:
+            with patch.object(dashboard, "parse_line"):
+                handled = dashboard.handle_serial_line("irrigation", "Soil Value = 1003")
+
+            self.assertTrue(handled)
+            self.assertEqual(dashboard.state["irrigation"]["last_message"], "Soil Value = 1003")
+        finally:
+            dashboard.state["irrigation"].clear()
+            dashboard.state["irrigation"].update(previous_state)
+
     def test_telemetry_endpoint_requires_token_and_routes_serial_line(self):
         headers = {"Authorization": "Bearer bridge-secret"}
         with patch.object(dashboard, "ARDUINO_BRIDGE_TOKEN", "bridge-secret"), patch.object(
