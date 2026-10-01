@@ -1,7 +1,8 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import app as dashboard
+import mqtt_bridge
 from app import module_connection_summary, parse_line
 
 
@@ -186,6 +187,32 @@ class HttpBridgeTests(unittest.TestCase):
         self.assertEqual(denied.status_code, 401)
         self.assertEqual(accepted.status_code, 200)
         handle_line.assert_called_once_with("irrigation", "SOIL DRY")
+
+
+class DisplayReconciliationTests(unittest.TestCase):
+    def test_transient_empty_response_keeps_token_displayed(self):
+        connection = Mock()
+
+        displayed_token = mqtt_bridge.reconcile_display(None, connection, 42)
+
+        self.assertEqual(displayed_token, 42)
+        connection.write.assert_not_called()
+
+    def test_same_active_token_is_not_rewritten(self):
+        connection = Mock()
+
+        displayed_token = mqtt_bridge.reconcile_display(42, connection, 42)
+
+        self.assertEqual(displayed_token, 42)
+        connection.write.assert_not_called()
+
+    def test_new_active_token_replaces_previous_token(self):
+        connection = Mock()
+
+        displayed_token = mqtt_bridge.reconcile_display(43, connection, 42)
+
+        self.assertEqual(displayed_token, 43)
+        connection.write.assert_called_once_with(b"DISPLAY:43\n")
 
 
 if __name__ == "__main__":

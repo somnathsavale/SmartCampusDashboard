@@ -128,33 +128,29 @@ def serial_worker(port, boards, client):
         time.sleep(4)
 
 
+def reconcile_display(token, connection, displayed_token):
+    if token is None or not str(token).isdigit():
+        return displayed_token
+    token = int(token)
+    if token != displayed_token:
+        connection.write(f"DISPLAY:{token}\n".encode("utf-8"))
+        print(f"Displayed active canteen token {token}")
+        return token
+    return displayed_token
+
+
 def command_worker():
     port = BOARD_PORTS["canteen"]
-    unknown_token = object()
-    last_token = unknown_token
-    empty_since = None
+    displayed_token = None
     while True:
         try:
             with connections_lock:
                 connection = connections.get(port)
                 if connection is not None and connection.is_open:
                     response = dashboard_request("/api/bridge/display")
-                    token = response.get("token")
-                    if token is not None and str(token).isdigit():
-                        token = int(token)
-                        empty_since = None
-                        if token != last_token:
-                            connection.write(f"DISPLAY:{token}\n".encode("utf-8"))
-                            last_token = token
-                            print(f"Displayed active canteen token {token}")
-                    elif last_token is not unknown_token:
-                        if empty_since is None:
-                            empty_since = time.monotonic()
-                        elif time.monotonic() - empty_since >= 5:
-                            connection.write(b"EMPTY\n")
-                            print("Cleared canteen display after queue stayed empty")
-                            last_token = None
-                            empty_since = None
+                    displayed_token = reconcile_display(
+                        response.get("token"), connection, displayed_token
+                    )
         except Exception as exc:
             print(f"Could not check dashboard commands: {exc}")
         time.sleep(1)
