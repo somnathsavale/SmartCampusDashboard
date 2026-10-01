@@ -214,6 +214,14 @@ class DisplayReconciliationTests(unittest.TestCase):
         self.assertEqual(displayed_token, 43)
         connection.write.assert_called_once_with(b"DISPLAY:43\n")
 
+    def test_stale_lower_token_does_not_replace_newer_token(self):
+        connection = Mock()
+
+        displayed_token = mqtt_bridge.reconcile_display(41, connection, 42)
+
+        self.assertEqual(displayed_token, 42)
+        connection.write.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

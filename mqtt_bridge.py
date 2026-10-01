@@ -132,6 +132,8 @@ def reconcile_display(token, connection, displayed_token):
     if token is None or not str(token).isdigit():
         return displayed_token
     token = int(token)
+    if displayed_token is not None and token < displayed_token:
+        return displayed_token
     if token != displayed_token:
         connection.write(f"DISPLAY:{token}\n".encode("utf-8"))
         print(f"Displayed active canteen token {token}")
